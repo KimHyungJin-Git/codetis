@@ -54,13 +54,14 @@ export function validatePassword(password: string): {
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+  const typeCount = [hasUpper, hasLower, hasNumber].filter(Boolean).length;
   return {
     hasLength,
     hasUpper,
     hasLower,
     hasNumber,
     hasSpecial,
-    isValid: hasLength && hasUpper && hasLower && hasNumber && hasSpecial,
+    isValid: hasLength && typeCount >= 2,
   };
 }
 
