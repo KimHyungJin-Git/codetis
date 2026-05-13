@@ -7,13 +7,12 @@ import { useRouter } from 'next/navigation';
 import { formatPhone, validateEmail } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
-function validateSimplePassword(password: string) {
+function validatePassword(password: string) {
   const hasLength = password.length >= 8 && password.length <= 16;
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
+  const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
-  const typeCount = [hasUpper, hasLower, hasNumber].filter(Boolean).length;
-  return { hasLength, hasUpper, hasLower, hasNumber, isValid: hasLength && typeCount >= 2 };
+  const isValid = hasLength && hasLetter && hasNumber;
+  return { hasLength, hasLetter, hasNumber, isValid };
 }
 
 type EmailStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
@@ -40,7 +39,8 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const passValidation = validateSimplePassword(form.password);
+  const passValidation = validatePassword(form.password);
+  const passwordsMatch = form.password === form.passwordConfirm;
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -49,24 +49,18 @@ export default function SignupPage() {
     setErrorMsg('');
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
     if (!val) return;
 
-    // 이메일 형식 아니면 바로 invalid
     if (!validateEmail(val)) {
       setEmailStatus('invalid');
       return;
     }
 
-    // 형식 맞으면 중복 검사
     debounceRef.current = setTimeout(async () => {
       setEmailStatus('checking');
       try {
         const { data, error } = await supabase.rpc('check_email_exists', { check_email: val });
-        if (error) {
-          setEmailStatus('available');
-          return;
-        }
+        if (error) { setEmailStatus('available'); return; }
         setEmailStatus(data === true ? 'unavailable' : 'available');
       } catch {
         setEmailStatus('available');
@@ -82,50 +76,62 @@ export default function SignupPage() {
       setErrorMsg('모든 항목을 입력해주세요.');
       return;
     }
-    if (emailStatus === 'unavailable' || emailStatus === 'invalid') return;
+    if (emailStatus !== 'available') return;
     if (!passValidation.isValid) {
       setErrorMsg('비밀번호 조건을 확인해주세요.');
       return;
     }
-    if (form.password !== form.passwordConfirm) {
+    if (!passwordsMatch) {
       setErrorMsg('비밀번호가 일치하지 않습니다.');
       return;
     }
 
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: { data: { name: form.name } },
-    });
-    setLoading(false);
-
-    if (error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
-        setErrorMsg('이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.');
-      } else if (msg.includes('password')) {
-        setErrorMsg('비밀번호가 조건에 맞지 않습니다. 다시 확인해주세요.');
-      } else if (msg.includes('rate')) {
-        setErrorMsg('잠시 후 다시 시도해주세요.');
-      } else {
-        setErrorMsg(`오류: ${error.message}`);
-      }
-      return;
-    }
-
-    if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        name: form.name,
-        phone: form.phone,
-        birthday: form.birthday,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: { data: { name: form.name } },
       });
-    }
 
-    setToast(true);
-    setTimeout(() => router.push('/login'), 2500);
+      if (error) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
+          setErrorMsg('이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.');
+        } else if (msg.includes('password')) {
+          setErrorMsg('비밀번호가 조건에 맞지 않습니다. 다시 확인해주세요.');
+        } else if (msg.includes('rate')) {
+          setErrorMsg('잠시 후 다시 시도해주세요.');
+        } else {
+          setErrorMsg(`오류가 발생했습니다: ${error.message}`);
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          name: form.name,
+          phone: form.phone,
+          birthday: form.birthday,
+        }).then(() => {/* ignore upsert errors */});
+      }
+
+      setLoading(false);
+      setToast(true);
+      setTimeout(() => router.push('/login'), 2500);
+    } catch {
+      setLoading(false);
+      setErrorMsg('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
   };
+
+  const isSubmitDisabled =
+    loading ||
+    !passValidation.isValid ||
+    !passwordsMatch ||
+    emailStatus !== 'available';
 
   return (
     <div className="flex flex-col min-h-screen bg-picks-bg page-fade">
@@ -221,21 +227,15 @@ export default function SignupPage() {
                 </div>
               )}
             </div>
-            {emailStatus === 'available' && (
-              <p className="text-[12px] text-green-500 mt-1">사용 가능합니다!</p>
-            )}
-            {emailStatus === 'unavailable' && (
-              <p className="text-[12px] text-picks-red mt-1">사용 불가능합니다.</p>
-            )}
-            {emailStatus === 'invalid' && (
-              <p className="text-[12px] text-picks-red mt-1">올바른 이메일 형식이 아닙니다.</p>
-            )}
+            {emailStatus === 'available' && <p className="text-[12px] text-green-500 mt-1">사용 가능한 아이디입니다!</p>}
+            {emailStatus === 'unavailable' && <p className="text-[12px] text-picks-red mt-1">이미 사용 중인 아이디입니다.</p>}
+            {emailStatus === 'invalid' && <p className="text-[12px] text-picks-red mt-1">올바른 이메일 형식이 아닙니다.</p>}
           </div>
 
           {/* 비밀번호 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1">비밀번호 <span className="text-picks-red">*</span></label>
-            <p className="text-[11px] text-gray-400 mb-1.5">8~16자, 영문 대/소문자·숫자 중 2종류 이상 혼용</p>
+            <p className="text-[11px] text-gray-400 mb-1.5">8~16자, 영문자·숫자 조합</p>
             <div className="relative">
               <input
                 type={showPass ? 'text' : 'password'}
@@ -252,7 +252,7 @@ export default function SignupPage() {
               <div className="mt-2 flex gap-3">
                 {[
                   { label: '8~16자', ok: passValidation.hasLength },
-                  { label: '대/소문자', ok: passValidation.hasUpper || passValidation.hasLower },
+                  { label: '영문 포함', ok: passValidation.hasLetter },
                   { label: '숫자 포함', ok: passValidation.hasNumber },
                 ].map((req) => (
                   <span key={req.label} className={`text-[11px] flex items-center gap-1 ${req.ok ? 'text-green-500' : 'text-gray-400'}`}>
@@ -274,7 +274,7 @@ export default function SignupPage() {
                 placeholder="비밀번호를 다시 입력하세요"
                 className={`w-full px-4 py-3.5 rounded-xl border bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors pr-12 ${
                   form.passwordConfirm.length > 0
-                    ? form.password === form.passwordConfirm ? 'border-green-400' : 'border-picks-red'
+                    ? passwordsMatch ? 'border-green-400' : 'border-picks-red'
                     : 'border-gray-200'
                 }`}
               />
@@ -282,10 +282,10 @@ export default function SignupPage() {
                 <EyeIcon open={showPassConfirm} />
               </button>
             </div>
-            {form.passwordConfirm.length > 0 && form.password === form.passwordConfirm && (
+            {form.passwordConfirm.length > 0 && passwordsMatch && (
               <p className="text-[12px] text-green-500 mt-1">비밀번호가 일치합니다!</p>
             )}
-            {form.passwordConfirm.length > 0 && form.password !== form.passwordConfirm && (
+            {form.passwordConfirm.length > 0 && !passwordsMatch && (
               <p className="text-[12px] text-picks-red mt-1">비밀번호가 일치하지 않습니다.</p>
             )}
           </div>
@@ -298,8 +298,8 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || emailStatus === 'unavailable' || emailStatus === 'invalid' || emailStatus === 'checking' || emailStatus === 'idle'}
-            className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mt-2 transition-all active:scale-95 disabled:opacity-50"
+            disabled={isSubmitDisabled}
+            className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mt-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
           >
             {loading ? (
@@ -322,7 +322,7 @@ export default function SignupPage() {
       {toast && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 toast-enter">
           <div className="bg-picks-dark text-white px-5 py-3.5 rounded-2xl shadow-lg text-[14px] font-medium max-w-[320px] text-center">
-            가입을 환영해요! 이메일을 확인해주세요 🎉
+            회원가입이 완료되었습니다! 🎉
           </div>
         </div>
       )}
