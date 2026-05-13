@@ -25,7 +25,7 @@ async function fetchOneContact(): Promise<{ name: string; phone: string } | null
       return null;
     }
   }
-  return { name: '강하늘', phone: '010-9876-5432' };
+  return null;
 }
 
 export default function NewContactPage() {

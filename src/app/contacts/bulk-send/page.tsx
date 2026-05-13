@@ -30,6 +30,17 @@ export default function BulkSendPage() {
 
   useEffect(() => {
     if (!user) return;
+    const DEFAULT_TEMPLATES = [
+      { category: '기본 안부', content: '안녕하세요! 잘 지내시죠? 오랜만에 연락드립니다 😊' },
+      { category: '기본 안부', content: '요즘 어떻게 지내세요? 생각이 나서 연락드렸어요!' },
+      { category: '친한 친구', content: '야! 나야 나 ㅋㅋ 요즘 뭐해? 밥이나 한번 먹자!' },
+      { category: '친한 친구', content: '오랜만이다~ 잘 지내지? 언제 한번 보자!' },
+      { category: '비즈니스', content: '안녕하세요. 잘 지내고 계신지요? 잠깐 연락드립니다.' },
+      { category: '비즈니스', content: '안녕하세요! 오랜만에 인사드립니다. 좋은 하루 보내세요!' },
+      { category: '특별한 날', content: '생일 축하해! 항상 건강하고 행복한 날들만 가득하길 바랍니다 🎂' },
+      { category: '특별한 날', content: '새해 복 많이 받으세요! 올 한 해도 좋은 일만 가득하시길 바랍니다 🧧' },
+    ];
+
     const fetchData = async () => {
       setDataLoading(true);
       const [{ data: conns }, { data: tmps }] = await Promise.all([
@@ -37,7 +48,17 @@ export default function BulkSendPage() {
         supabase.from('message_templates').select('*').eq('user_id', user.id).order('created_at'),
       ]);
       setConnections((conns as Connection[]) ?? []);
-      const tmpList = (tmps as MessageTemplate[]) ?? [];
+      let tmpList = (tmps as MessageTemplate[]) ?? [];
+
+      if (tmpList.length === 0) {
+        const toInsert = DEFAULT_TEMPLATES.map((t) => ({ ...t, user_id: user.id }));
+        const { data: seeded } = await supabase
+          .from('message_templates')
+          .insert(toInsert)
+          .select();
+        tmpList = (seeded as MessageTemplate[]) ?? [];
+      }
+
       setTemplates(tmpList);
       const catSet = new Set(tmpList.map((t) => t.category));
       const cats = Array.from(catSet);

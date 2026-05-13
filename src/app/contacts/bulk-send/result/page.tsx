@@ -20,12 +20,7 @@ export default function BulkSendResultPage() {
     if (stored) {
       setResult(JSON.parse(stored));
     } else {
-      // Fallback mock result
-      setResult({
-        sent: ['김민준', '이서연', '정도현'],
-        failed: ['박준혁', '최지아'],
-        total: 3,
-      });
+      router.replace('/contacts/bulk-send');
     }
   }, []);
 

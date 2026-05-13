@@ -20,6 +20,8 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
   const [toast, setToast] = useState('');
   const [dataLoading, setDataLoading] = useState(true);
   const [categories, setCategories] = useState<string[]>(['친구', '가족', '비즈니스']);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', phone: '', birthday: '' });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -69,6 +71,29 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
     setEditingMemo(false);
   };
 
+  const handleEditToggle = () => {
+    if (!contact) return;
+    if (!editMode) {
+      setEditForm({ name: contact.name, phone: contact.phone ?? '', birthday: contact.birthday ?? '' });
+    }
+    setEditMode(!editMode);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!contact || !editForm.name || !editForm.phone) {
+      showToast('이름과 연락처는 필수입니다.');
+      return;
+    }
+    await supabase.from('connections').update({
+      name: editForm.name,
+      phone: editForm.phone,
+      birthday: editForm.birthday || null,
+    }).eq('id', contact.id);
+    setContact((prev) => prev ? { ...prev, name: editForm.name, phone: editForm.phone, birthday: editForm.birthday || undefined } : prev);
+    setEditMode(false);
+    showToast('정보가 수정되었습니다.');
+  };
+
   const handleCategoryChange = async (cat: string) => {
     if (!contact) return;
     setSelectedCategory(cat);
@@ -108,9 +133,13 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             <path d="M19 12H5M12 5l-7 7 7 7" />
           </svg>
         </button>
-        <span className="text-[17px] font-bold text-picks-dark">{contact.name}</span>
-        <button onClick={() => showToast('편집 모드')} className="text-[14px] font-medium" style={{ color: '#D6536D' }}>
-          편집
+        <span className="text-[17px] font-bold text-picks-dark">{editMode ? '편집 중' : contact.name}</span>
+        <button
+          onClick={editMode ? handleSaveEdit : handleEditToggle}
+          className="text-[14px] font-medium"
+          style={{ color: '#D6536D' }}
+        >
+          {editMode ? '완료' : '편집'}
         </button>
       </div>
 
@@ -125,15 +154,50 @@ export default function ContactDetailPage({ params }: { params: { id: string } }
             className="w-24 h-24 rounded-full flex items-center justify-center text-white text-4xl font-bold shadow-card-md"
             style={{ background: contact.avatar_color }}
           >
-            {contact.name.charAt(0)}
+            {(editMode ? editForm.name : contact.name).charAt(0)}
           </div>
-          <h2 className="text-[22px] font-bold text-picks-dark mt-4">{contact.name}</h2>
-          <span
-            className="mt-2 px-3 py-1 rounded-full text-[13px] font-medium"
-            style={{ background: '#fdf0f2', color: '#D6536D' }}
-          >
-            {selectedCategory}
-          </span>
+
+          {editMode ? (
+            <div className="w-full mt-4 flex flex-col gap-3">
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="이름"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark text-center font-bold focus:border-picks-rose transition-colors"
+              />
+              <input
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                placeholder="010-0000-0000"
+                maxLength={13}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark text-center focus:border-picks-rose transition-colors"
+              />
+              <input
+                type="date"
+                value={editForm.birthday}
+                onChange={(e) => setEditForm((p) => ({ ...p, birthday: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark text-center focus:border-picks-rose transition-colors"
+              />
+              <button
+                onClick={() => setEditMode(false)}
+                className="text-[13px] text-gray-400 mt-1"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-[22px] font-bold text-picks-dark mt-4">{contact.name}</h2>
+              <span
+                className="mt-2 px-3 py-1 rounded-full text-[13px] font-medium"
+                style={{ background: '#fdf0f2', color: '#D6536D' }}
+              >
+                {selectedCategory}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="px-7 space-y-3 pb-4">
