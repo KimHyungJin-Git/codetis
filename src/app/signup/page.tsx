@@ -103,11 +103,13 @@ export default function SignupPage() {
     if (error) {
       const msg = error.message.toLowerCase();
       if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
-        setEmailStatus('unavailable');
+        setErrorMsg('이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.');
       } else if (msg.includes('password')) {
-        setErrorMsg('비밀번호가 너무 간단합니다. 다시 확인해주세요.');
+        setErrorMsg('비밀번호가 조건에 맞지 않습니다. 다시 확인해주세요.');
+      } else if (msg.includes('rate')) {
+        setErrorMsg('잠시 후 다시 시도해주세요.');
       } else {
-        setErrorMsg('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
+        setErrorMsg(`오류: ${error.message}`);
       }
       return;
     }
