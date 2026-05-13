@@ -2,12 +2,10 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPhone, validateEmail } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-
-type EmailStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 
 function validateSimplePassword(password: string) {
   const hasLength = password.length >= 8 && password.length <= 16;
@@ -15,76 +13,49 @@ function validateSimplePassword(password: string) {
   const hasLower = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const typeCount = [hasUpper, hasLower, hasNumber].filter(Boolean).length;
-  return {
-    hasLength,
-    hasUpper,
-    hasLower,
-    hasNumber,
-    isValid: hasLength && typeCount >= 2,
-  };
+  return { hasLength, hasUpper, hasLower, hasNumber, isValid: hasLength && typeCount >= 2 };
 }
+
+const EyeIcon = ({ open }: { open: boolean }) => open ? (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+) : (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+  </svg>
+);
 
 export default function SignupPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: '',
-    birthday: '',
-    phone: '',
-    email: '',
-    password: '',
-    passwordConfirm: '',
-  });
-  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
+  const [form, setForm] = useState({ name: '', birthday: '', phone: '', email: '', password: '', passwordConfirm: '' });
+  const [emailValid, setEmailValid] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [showPassConfirm, setShowPassConfirm] = useState(false);
   const [toast, setToast] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const passValidation = validateSimplePassword(form.password);
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }));
-  };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setForm((prev) => ({ ...prev, email: val }));
-    setEmailStatus('idle');
+    setForm((p) => ({ ...p, email: val }));
+    setEmailValid(validateEmail(val));
     setErrorMsg('');
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!validateEmail(val)) return;
-
-    debounceRef.current = setTimeout(async () => {
-      setEmailStatus('checking');
-      try {
-        // Supabase signUp with a dummy password to check if email exists
-        // Instead, use OTP check via auth admin — fallback: just mark available and let signup catch it
-        // We attempt a password reset to probe existence without creating an account
-        const { error } = await supabase.auth.resetPasswordForEmail(val, {
-          redirectTo: undefined as unknown as string,
-        });
-        // If no error, email likely exists (reset email sent) → but we can't distinguish
-        // Use profiles table check instead — mark available optimistically
-        if (error && error.message.includes('not found')) {
-          setEmailStatus('available');
-        } else {
-          // Can't reliably detect — mark available, let signup handle duplicate
-          setEmailStatus('available');
-        }
-      } catch {
-        setEmailStatus('available');
-      }
-    }, 700);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
     if (!form.name || !form.birthday || !form.phone || !form.email || !form.password || !form.passwordConfirm) {
       setErrorMsg('모든 항목을 입력해주세요.');
+      return;
+    }
+    if (!emailValid) {
+      setErrorMsg('올바른 이메일 형식을 입력해주세요.');
       return;
     }
     if (!passValidation.isValid) {
@@ -97,49 +68,38 @@ export default function SignupPage() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      options: {
-        data: { name: form.name },
-      },
+      options: { data: { name: form.name } },
     });
     setLoading(false);
 
     if (error) {
-      if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already registered')) {
-        setEmailStatus('unavailable');
-        setErrorMsg('이미 사용 중인 이메일입니다.');
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
+        setErrorMsg('이미 사용 중인 이메일입니다. 로그인해주세요.');
+      } else if (msg.includes('password')) {
+        setErrorMsg('비밀번호가 너무 간단합니다. 다시 확인해주세요.');
       } else {
-        setErrorMsg(error.message);
+        setErrorMsg('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.');
       }
       return;
     }
 
     // 프로필 추가 정보 업데이트
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await supabase.from('profiles').update({
+    if (data.user) {
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
         name: form.name,
         phone: form.phone,
         birthday: form.birthday,
-      }).eq('id', session.user.id);
+      });
     }
 
     setToast(true);
     setTimeout(() => router.push('/login'), 2500);
   };
-
-  const EyeIcon = ({ open }: { open: boolean }) => open ? (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  ) : (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-    </svg>
-  );
 
   return (
     <div className="flex flex-col min-h-screen bg-picks-bg page-fade">
@@ -188,7 +148,7 @@ export default function SignupPage() {
             <input
               type="tel"
               value={form.phone}
-              onChange={handlePhoneChange}
+              onChange={(e) => setForm((p) => ({ ...p, phone: formatPhone(e.target.value) }))}
               placeholder="숫자만 입력하면 자동으로 형식이 맞춰집니다"
               className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
               maxLength={13}
@@ -210,35 +170,21 @@ export default function SignupPage() {
                 autoCorrect="off"
                 autoCapitalize="none"
                 className={`w-full px-4 py-3.5 rounded-xl border bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors pr-10 ${
-                  emailStatus === 'unavailable' ? 'border-picks-red' :
-                  emailStatus === 'available' ? 'border-green-400' : 'border-gray-200'
+                  form.email.length > 0
+                    ? emailValid ? 'border-green-400' : 'border-gray-200'
+                    : 'border-gray-200'
                 }`}
               />
-              {emailStatus === 'checking' && (
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                  <span className="w-4 h-4 border-2 rounded-full animate-spin block" style={{ borderColor: '#D6536D', borderTopColor: 'transparent' }} />
-                </div>
-              )}
-              {emailStatus === 'available' && (
+              {form.email.length > 0 && emailValid && (
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-green-500">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
               )}
-              {emailStatus === 'unavailable' && (
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-picks-red">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </div>
-              )}
             </div>
-            {emailStatus === 'available' && (
+            {form.email.length > 0 && emailValid && (
               <p className="text-[12px] text-green-500 mt-1">사용 가능한 아이디입니다!</p>
-            )}
-            {emailStatus === 'unavailable' && (
-              <p className="text-[12px] text-picks-red mt-1">사용 불가능한 아이디입니다.</p>
             )}
           </div>
 
@@ -299,12 +245,14 @@ export default function SignupPage() {
 
           {/* 에러 메시지 */}
           {errorMsg && (
-            <p className="text-[13px] text-picks-red text-center">{errorMsg}</p>
+            <div className="px-4 py-3 rounded-xl text-[13px] text-picks-red text-center" style={{ background: '#fdf0f2' }}>
+              {errorMsg}
+            </div>
           )}
 
           <button
             type="submit"
-            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm}
+            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || !emailValid}
             className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mt-2 transition-all active:scale-95 disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
           >
