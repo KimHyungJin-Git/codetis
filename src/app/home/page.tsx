@@ -11,6 +11,7 @@ import { getDaysUntilBirthday, formatBirthday } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import type { Connection, CalendarEvent } from '@/lib/types';
+import { getUpcomingGreetingSeasons, getDdayLabel, type GreetingSeason } from '@/lib/greetingSeasons';
 
 const todayBase = new Date();
 todayBase.setHours(0, 0, 0, 0);
@@ -121,6 +122,7 @@ export default function HomePage() {
   }, [user]);
 
   const bannerItems = buildBannerItems(connections, events);
+  const greetingSeasons = getUpcomingGreetingSeasons(new Date());
 
   useEffect(() => {
     if (bannerItems.length === 0) return;
@@ -173,6 +175,59 @@ export default function HomePage() {
             >
               가입하기
             </button>
+          </div>
+        )}
+
+        {/* ── 명절/시즌 안부 배너 ── */}
+        {greetingSeasons.length > 0 && (
+          <div className="mt-4">
+            <div className="px-7 mb-3 flex items-center justify-between">
+              <h3 className="text-[16px] font-bold text-picks-dark">안부 드리기 좋은 시기</h3>
+              <span className="text-[12px] text-gray-400">{greetingSeasons.length}개</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-7 pb-1">
+              {greetingSeasons.map((season: GreetingSeason) => {
+                const ddayLabel = getDdayLabel(season.date, new Date());
+                return (
+                  <div
+                    key={season.id}
+                    className="flex-shrink-0 rounded-2xl p-4 flex flex-col justify-between"
+                    style={{
+                      background: season.gradient,
+                      width: '200px',
+                      minHeight: '130px',
+                    }}
+                  >
+                    {/* 상단: D-day 뱃지 + 이모지 */}
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}
+                      >
+                        {ddayLabel}
+                      </span>
+                      <span className="text-2xl">{season.emoji}</span>
+                    </div>
+
+                    {/* 하단: 이름 + 버튼 */}
+                    <div>
+                      <p className="text-white font-bold text-[18px] leading-tight mb-0.5">{season.name}</p>
+                      <p className="text-white/70 text-[11px] leading-snug mb-3">{season.tip}</p>
+                      <Link
+                        href="/contacts/bulk-send"
+                        className="inline-flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-full active:scale-95 transition-transform"
+                        style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}
+                      >
+                        안부 보내기
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
