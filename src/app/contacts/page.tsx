@@ -88,10 +88,26 @@ export default function ContactsPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [categories, setCategories] = useState<string[]>(['전체', '친구', '가족', '비즈니스']);
   const [dataLoading, setDataLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return;
+    if (user) return;
+    const guest = typeof window !== 'undefined' && localStorage.getItem('picks_is_guest') === 'true';
+    if (guest) {
+      setIsGuest(true);
+      try {
+        const saved = localStorage.getItem('picks_guest_contacts');
+        if (saved) {
+          const conns: Connection[] = JSON.parse(saved);
+          setConnections(conns);
+          const cats = ['전체', ...Array.from(new Set(conns.map((c) => c.category)))];
+          setCategories(cats);
+        }
+      } catch { /* ignore */ }
+      setDataLoading(false);
+    } else {
       router.replace('/onboarding');
     }
   }, [user, authLoading, router]);
@@ -149,6 +165,20 @@ export default function ContactsPage() {
       <TopBar />
 
       <div className="flex-1 overflow-y-auto pb-36" style={{ paddingTop: '64px' }}>
+
+        {/* 비회원 안내 배너 */}
+        {isGuest && (
+          <div className="mx-7 mt-4 px-4 py-3 rounded-2xl flex items-center justify-between" style={{ background: '#fdf0f2' }}>
+            <p className="text-[12px] text-gray-500">비회원 모드 — 데이터가 저장되지 않아요</p>
+            <button
+              onClick={() => router.push('/signup')}
+              className="text-[12px] font-bold px-3 py-1 rounded-full text-white"
+              style={{ background: '#D6536D' }}
+            >
+              가입하기
+            </button>
+          </div>
+        )}
 
         {/* 상단: 대상 리스트 추천 배너 */}
         <Link href="/contacts/bulk-send" className="block mt-4">

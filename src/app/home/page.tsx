@@ -79,9 +79,20 @@ export default function HomePage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (authLoading) return;
+    if (user) return;
+    const guest = typeof window !== 'undefined' && localStorage.getItem('picks_is_guest') === 'true';
+    if (guest) {
+      setIsGuest(true);
+      try {
+        const saved = localStorage.getItem('picks_guest_contacts');
+        if (saved) setConnections(JSON.parse(saved));
+      } catch { /* ignore */ }
+      setDataLoading(false);
+    } else {
       router.replace('/onboarding');
     }
   }, [user, authLoading, router]);
@@ -150,6 +161,20 @@ export default function HomePage() {
       <TopBar />
 
       <div className="flex-1 overflow-y-auto pb-24" style={{ paddingTop: '64px' }}>
+
+        {/* 비회원 안내 배너 */}
+        {isGuest && (
+          <div className="mx-7 mt-4 px-4 py-3 rounded-2xl flex items-center justify-between" style={{ background: '#fdf0f2' }}>
+            <p className="text-[12px] text-gray-500">비회원 모드 — 데이터가 저장되지 않아요</p>
+            <button
+              onClick={() => router.push('/signup')}
+              className="text-[12px] font-bold px-3 py-1 rounded-full text-white"
+              style={{ background: '#D6536D' }}
+            >
+              가입하기
+            </button>
+          </div>
+        )}
 
         {/* ── 이번 주 일정 배너 (edge-to-edge) ── */}
         <div className="mt-4">

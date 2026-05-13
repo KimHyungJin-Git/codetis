@@ -83,6 +83,18 @@ export default function OnboardingPage() {
       await supabase
         .from('user_categories')
         .upsert({ user_id: userId, name: defaultCategory }, { onConflict: 'user_id,name' });
+    } else {
+      const guestContacts = list.map((c, i) => ({
+        id: `guest-${i}`,
+        user_id: 'guest',
+        name: c.name,
+        phone: c.phone,
+        category: '친구',
+        avatar_color: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        last_contact: new Date().toISOString().split('T')[0],
+      }));
+      localStorage.setItem('picks_guest_contacts', JSON.stringify(guestContacts));
+      localStorage.setItem('picks_is_guest', 'true');
     }
 
     showToast(`${list.length}명의 연락처가 연동되었습니다!`);
@@ -146,6 +158,18 @@ export default function OnboardingPage() {
       await supabase
         .from('user_categories')
         .upsert({ user_id: userId, name: pickedCategory }, { onConflict: 'user_id,name' });
+    } else {
+      const guestContacts = selectedContacts.map((c, i) => ({
+        id: `guest-${i}`,
+        user_id: 'guest',
+        name: c.name,
+        phone: c.phone,
+        category: pickedCategory,
+        avatar_color: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        last_contact: new Date().toISOString().split('T')[0],
+      }));
+      localStorage.setItem('picks_guest_contacts', JSON.stringify(guestContacts));
+      localStorage.setItem('picks_is_guest', 'true');
     }
 
     setShowSyncPopup(false);
