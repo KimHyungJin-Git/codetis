@@ -99,6 +99,7 @@ export default function SignupPage() {
     setLoading(false);
 
     if (error) {
+      console.error('[PICKS] signUp error:', error);
       const msg = error.message.toLowerCase();
       if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
         setErrorMsg('이미 가입된 이메일입니다. 로그인 페이지에서 로그인해주세요.');
@@ -106,10 +107,12 @@ export default function SignupPage() {
         setErrorMsg('비밀번호가 조건에 맞지 않습니다. 다시 확인해주세요.');
       } else if (msg.includes('rate')) {
         setErrorMsg('잠시 후 다시 시도해주세요.');
-      } else if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
-        setErrorMsg('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      } else if (msg.includes('disabled') || msg.includes('not allowed')) {
+        setErrorMsg('회원가입이 현재 비활성화되어 있습니다. Supabase 설정을 확인해주세요.');
+      } else if (msg.includes('captcha')) {
+        setErrorMsg('보안 인증이 필요합니다. (captcha)');
       } else {
-        setErrorMsg(`오류가 발생했습니다. 다시 시도해주세요. (${error.message})`);
+        setErrorMsg(`[DEBUG] ${error.message}`);
       }
       return;
     }
