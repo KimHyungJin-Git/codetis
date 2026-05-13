@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { mockNotifications } from '@/lib/mockData';
 
 interface TopBarProps {
   showLogo?: boolean;
@@ -18,7 +17,7 @@ export default function TopBar({
   showBack = false,
   rightElement,
 }: TopBarProps) {
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const unreadCount = 0;
 
   return (
     <header

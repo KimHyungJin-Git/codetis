@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { mockNotifications } from '@/lib/mockData';
 
 type FilterType = '전체' | '생일' | '신년' | '미연락' | '시즌' | '리마인드';
 type NotifType = 'birthday' | 'newyear' | 'nocontact' | 'season' | 'reminder';
@@ -54,7 +53,7 @@ function formatNotifDate(dateStr: string): string {
 export default function NotificationsPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>('전체');
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<{ id: string; type: NotifType; title: string; body: string; date: string; read: boolean }[]>([]);
 
   const filteredType = typeMap[filter];
   const filtered = filteredType

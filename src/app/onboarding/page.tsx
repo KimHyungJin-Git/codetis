@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { mockImportContacts } from '@/lib/mockData';
 import { formatPhone } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
@@ -63,7 +62,11 @@ export default function OnboardingPage() {
     setSyncing(false);
 
     if (real === null) return;
-    const list = real ?? mockImportContacts;
+    const list = real ?? [];
+    if (list.length === 0) {
+      showToast('연락처를 불러올 수 없습니다. 기기에서 연락처 권한을 허용해주세요.');
+      return;
+    }
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
@@ -108,7 +111,11 @@ export default function OnboardingPage() {
 
     if (real === null) return;
 
-    const list: PhoneContact[] = real ?? mockImportContacts;
+    const list: PhoneContact[] = real ?? [];
+    if (list.length === 0) {
+      showToast('연락처를 불러올 수 없습니다. 기기에서 연락처 권한을 허용해주세요.');
+      return;
+    }
     setContactList(list);
     setSelected(new Set());
     setStep('list');
