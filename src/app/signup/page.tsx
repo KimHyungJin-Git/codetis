@@ -118,7 +118,7 @@ export default function SignupPage() {
         password: form.password,
       }).then(({ error: loginError }) => {
         setTimeout(() => {
-          router.replace(loginError ? '/login' : '/home');
+          router.replace(loginError ? '/login' : '/onboarding');
         }, 2000);
       });
     } catch (err) {

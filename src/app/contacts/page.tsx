@@ -288,10 +288,37 @@ export default function ContactsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="picks-card p-8 text-center">
-              <p className="text-gray-400 text-[14px]">연락처가 없습니다</p>
-              <Link href="/contacts/new" className="text-[13px] font-semibold mt-2 block" style={{ color: '#D6536D' }}>
-                + 관계 추가하기
-              </Link>
+              {search ? (
+                <>
+                  <p className="text-gray-400 text-[14px]">'{search}'에 해당하는 연락처가 없어요</p>
+                  <button onClick={() => setSearch('')} className="text-[13px] font-semibold mt-2 block w-full" style={{ color: '#D6536D' }}>
+                    검색 초기화
+                  </button>
+                </>
+              ) : connections.length === 0 ? (
+                <>
+                  <div className="text-4xl mb-3">👥</div>
+                  <p className="text-[15px] font-semibold text-picks-dark mb-1">아직 추가된 연락처가 없어요</p>
+                  <p className="text-[13px] text-gray-400 mb-5">소중한 사람들을 추가하고<br />관계를 관리해보세요</p>
+                  <Link
+                    href="/onboarding"
+                    className="block w-full py-3 rounded-2xl font-semibold text-[14px] text-white mb-2 active:scale-95 transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
+                  >
+                    📱 내 연락처 가져오기
+                  </Link>
+                  <Link href="/contacts/new" className="block w-full py-3 rounded-2xl font-semibold text-[14px] border border-gray-200 text-gray-500 active:scale-95 transition-transform">
+                    + 직접 추가하기
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-400 text-[14px]">해당 카테고리의 연락처가 없어요</p>
+                  <button onClick={() => setActiveCategory('전체')} className="text-[13px] font-semibold mt-2 block w-full" style={{ color: '#D6536D' }}>
+                    전체 보기
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             filtered.map((contact) => (

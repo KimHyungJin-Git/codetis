@@ -324,6 +324,25 @@ export default function HomePage() {
                 ))}
               </div>
             </div>
+          ) : connections.length === 0 ? (
+            /* 연락처가 아직 없을 때 — 시작 안내 카드 */
+            <div
+              className="flex flex-col items-center justify-center px-7 text-center"
+              style={{
+                height: '180px',
+                background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)',
+              }}
+            >
+              <p className="text-white font-bold text-[16px] mb-1">내 연락처를 가져와보세요</p>
+              <p className="text-white/70 text-[12px] mb-4">소중한 사람들을 PICKS에 추가하면<br />생일, 안부를 놓치지 않아요</p>
+              <Link
+                href="/onboarding"
+                className="text-[13px] font-bold px-5 py-2 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}
+              >
+                연락처 가져오기 →
+              </Link>
+            </div>
           ) : (
             <div
               className="flex flex-col items-center justify-center"
