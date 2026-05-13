@@ -108,17 +108,23 @@ export default function SignupPage() {
         });
       }
 
+      // 가입 직후 바로 로그인 (이메일 인증 없이)
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
       setLoading(false);
       setSuccess(true);
 
-      // 세션이 바로 생기면 홈으로, 이메일 인증 필요하면 로그인으로
       setTimeout(() => {
-        if (data.session) {
-          router.replace('/home');
-        } else {
+        if (loginError) {
+          // 자동 로그인 실패 시 로그인 페이지로 (이메일 인증이 켜져 있는 경우)
           router.replace('/login');
+        } else {
+          router.replace('/home');
         }
-      }, 2000);
+      }, 1500);
     } catch (err) {
       console.error('Signup error:', err);
       setLoading(false);
