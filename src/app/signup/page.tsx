@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPhone, validateEmail } from '@/lib/utils';
@@ -108,8 +106,10 @@ export default function SignupPage() {
         setErrorMsg('비밀번호가 조건에 맞지 않습니다. 다시 확인해주세요.');
       } else if (msg.includes('rate')) {
         setErrorMsg('잠시 후 다시 시도해주세요.');
+      } else if (msg.includes('load failed') || msg.includes('failed to fetch') || msg.includes('network')) {
+        setErrorMsg('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
       } else {
-        setErrorMsg(`오류: ${error.message}`);
+        setErrorMsg(`오류가 발생했습니다. 다시 시도해주세요. (${error.message})`);
       }
       return;
     }
