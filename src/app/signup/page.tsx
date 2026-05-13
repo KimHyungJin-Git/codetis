@@ -2,10 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPhone, validateEmail, validatePassword } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+
+type EmailStatus = 'idle' | 'checking' | 'available' | 'unavailable';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,11 +19,13 @@ export default function SignupPage() {
     password: '',
     passwordConfirm: '',
   });
-  const [emailStatus, setEmailStatus] = useState<'idle' | 'available' | 'unavailable'>('idle');
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
   const [showPass, setShowPass] = useState(false);
   const [showPassConfirm, setShowPassConfirm] = useState(false);
   const [toast, setToast] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const passValidation = validatePassword(form.password);
 
@@ -29,16 +33,33 @@ export default function SignupPage() {
     setForm((prev) => ({ ...prev, phone: formatPhone(e.target.value) }));
   };
 
-  const handleEmailChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setForm((prev) => ({ ...prev, email: val }));
-    if (validateEmail(val)) {
-      await new Promise((r) => setTimeout(r, 400));
-      // We'll validate after submission; just show idle for now
+  const checkEmailDuplicate = useCallback(async (email: string) => {
+    if (!validateEmail(email)) {
       setEmailStatus('idle');
-    } else {
+      return;
+    }
+    setEmailStatus('checking');
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+      setEmailStatus(data ? 'unavailable' : 'available');
+    } catch {
       setEmailStatus('idle');
     }
+  }, []);
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setForm((prev) => ({ ...prev, email: val }));
+    setEmailStatus('idle');
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      checkEmailDuplicate(val);
+    }, 600);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,9 +74,7 @@ export default function SignupPage() {
       email: form.email,
       password: form.password,
       options: {
-        data: {
-          name: form.name,
-        },
+        data: { name: form.name },
       },
     });
     setLoading(false);
@@ -69,7 +88,6 @@ export default function SignupPage() {
       return;
     }
 
-    // Update profile with additional info
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       await supabase.from('profiles').update({
@@ -81,9 +99,7 @@ export default function SignupPage() {
 
     setEmailStatus('available');
     setToast(true);
-    setTimeout(() => {
-      router.push('/login');
-    }, 2500);
+    setTimeout(() => router.push('/login'), 2500);
   };
 
   return (
@@ -109,7 +125,7 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* 이름 */}
           <div>
-            <label className="block text-[13px] font-medium text-gray-600 mb-1.5">이름/닉네임 <span className="text-picks-red">*</span></label>
+            <label className="block text-[13px] font-medium text-gray-600 mb-1.5">이름 또는 닉네임 <span className="text-picks-red">*</span></label>
             <input
               type="text"
               value={form.name}
@@ -137,34 +153,60 @@ export default function SignupPage() {
               type="tel"
               value={form.phone}
               onChange={handlePhoneChange}
-              placeholder="010-0000-0000"
+              placeholder="숫자만 입력하면 자동으로 형식이 맞춰집니다"
               className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
               maxLength={13}
+              inputMode="numeric"
             />
           </div>
 
-          {/* 이메일 */}
+          {/* 이메일 아이디 */}
           <div>
-            <label className="block text-[13px] font-medium text-gray-600 mb-1.5">아이디(이메일) <span className="text-picks-red">*</span></label>
-            <input
-              type="email"
-              value={form.email}
-              onChange={handleEmailChange}
-              placeholder="example@email.com"
-              className={`w-full px-4 py-3.5 rounded-xl border bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors ${
-                emailStatus === 'unavailable' ? 'border-picks-red' :
-                emailStatus === 'available' ? 'border-green-400' : 'border-gray-200'
-              }`}
-            />
+            <label className="block text-[13px] font-medium text-gray-600 mb-1.5">
+              아이디(이메일 형식) <span className="text-picks-red">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                value={form.email}
+                onChange={handleEmailChange}
+                placeholder="example@email.com"
+                autoComplete="email"
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="none"
+                className={`w-full px-4 py-3.5 rounded-xl border bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors pr-10 ${
+                  emailStatus === 'unavailable' ? 'border-picks-red' :
+                  emailStatus === 'available' ? 'border-green-400' : 'border-gray-200'
+                }`}
+              />
+              {emailStatus === 'checking' && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                  <span className="w-4 h-4 border-2 rounded-full animate-spin block" style={{ borderColor: '#D6536D', borderTopColor: 'transparent' }} />
+                </div>
+              )}
+              {emailStatus === 'available' && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-green-500">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+              )}
+              {emailStatus === 'unavailable' && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-picks-red">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+              )}
+            </div>
             {emailStatus === 'available' && (
               <p className="text-[12px] text-green-500 mt-1 flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="2,6 5,9 10,3" /></svg>
                 사용 가능한 아이디입니다!
               </p>
             )}
             {emailStatus === 'unavailable' && (
               <p className="text-[12px] text-picks-red mt-1 flex items-center gap-1">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="2" y1="2" x2="10" y2="10" /><line x1="10" y1="2" x2="2" y2="10" /></svg>
                 사용 불가능한 아이디입니다.
               </p>
             )}
@@ -172,13 +214,14 @@ export default function SignupPage() {
 
           {/* 비밀번호 */}
           <div>
-            <label className="block text-[13px] font-medium text-gray-600 mb-1.5">비밀번호 <span className="text-picks-red">*</span></label>
+            <label className="block text-[13px] font-medium text-gray-600 mb-1">비밀번호 <span className="text-picks-red">*</span></label>
+            <p className="text-[11px] text-gray-400 mb-1.5">8~16자, 영문 대/소문자·숫자·특수문자 중 2~3종류 이상 혼용</p>
             <div className="relative">
               <input
                 type={showPass ? 'text' : 'password'}
                 value={form.password}
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                placeholder="8-16자, 영문 대/소문자, 숫자, 특수문자"
+                placeholder="비밀번호를 입력하세요"
                 className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors pr-12"
               />
               <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -196,7 +239,7 @@ export default function SignupPage() {
             {form.password.length > 0 && (
               <div className="mt-2 grid grid-cols-2 gap-1">
                 {[
-                  { label: '8-16자', ok: passValidation.hasLength },
+                  { label: '8~16자', ok: passValidation.hasLength },
                   { label: '대문자 포함', ok: passValidation.hasUpper },
                   { label: '소문자 포함', ok: passValidation.hasLower },
                   { label: '숫자 포함', ok: passValidation.hasNumber },
@@ -249,7 +292,7 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || emailStatus === 'unavailable'}
+            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || emailStatus === 'unavailable' || emailStatus === 'checking'}
             className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mt-2 transition-all active:scale-95 disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
           >
@@ -260,14 +303,20 @@ export default function SignupPage() {
               </span>
             ) : '회원가입'}
           </button>
+
+          <p className="text-center text-[13px] text-gray-400">
+            이미 계정이 있으신가요?{' '}
+            <button type="button" onClick={() => router.push('/login')} className="font-semibold" style={{ color: '#D6536D' }}>
+              로그인
+            </button>
+          </p>
         </form>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 toast-enter">
           <div className="bg-picks-dark text-white px-5 py-3.5 rounded-2xl shadow-lg text-[14px] font-medium max-w-[320px] text-center">
-            이메일로 인증 메일이 발송되었습니다! 🎉
+            가입을 환영해요! 이메일을 확인해주세요 🎉
           </div>
         </div>
       )}

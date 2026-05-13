@@ -161,10 +161,14 @@ export default function HomePage() {
           </div>
 
           {dataLoading ? (
-            <div className="mx-7 rounded-2xl p-6 text-center" style={{ background: '#f0f0ee' }}>
-              <div className="flex justify-center">
-                <div className="w-5 h-5 border-2 border-picks-rose border-t-transparent rounded-full animate-spin" />
-              </div>
+            <div
+              className="flex items-center justify-center"
+              style={{
+                height: '180px',
+                background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              }}
+            >
+              <div className="w-5 h-5 border-2 border-white/50 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : bannerItems.length > 0 ? (
             <div className="relative" style={{ height: '180px' }}>
@@ -241,9 +245,19 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div className="mx-7 rounded-2xl p-6 text-center" style={{ background: '#f0f0ee' }}>
-              <p className="text-gray-400 text-[14px]">이번 주 예정된 일정이 없습니다</p>
-              <Link href="/calendar/new" className="text-[13px] font-semibold mt-2 block" style={{ color: '#D6536D' }}>
+            <div
+              className="flex flex-col items-center justify-center"
+              style={{
+                height: '180px',
+                background: 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              }}
+            >
+              <p className="text-white/50 text-[14px] mb-2">이번 주 예정된 일정이 없습니다</p>
+              <Link
+                href="/calendar/new"
+                className="text-[13px] font-semibold px-4 py-1.5 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}
+              >
                 + 일정 추가하기
               </Link>
             </div>

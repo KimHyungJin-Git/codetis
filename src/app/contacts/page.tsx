@@ -10,13 +10,73 @@ import BottomNav from '@/components/BottomNav';
 import { getDaysAgo, getDaysUntilBirthday, formatBirthday } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
-import type { Connection } from '@/lib/types';
+import type { Connection, CalendarEvent } from '@/lib/types';
 
 const bannerGradients = [
   'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)',
   'linear-gradient(135deg, #EFB11D 0%, #D6536D 100%)',
-  'linear-gradient(135deg, #4CAF50 0%, #2196F3 100%)',
+  'linear-gradient(135deg, #E43D12 0%, #D6536D 80%)',
 ];
+
+type BannerItem = {
+  id: string;
+  name: string;
+  sub: string;
+  label: string;
+  gradient: string;
+  phone?: string;
+};
+
+function buildRecommendedBanners(connections: Connection[], events: CalendarEvent[]): BannerItem[] {
+  const now = new Date();
+
+  // 생일 제외한 캘린더 기반 이벤트 연관 인물
+  const eventBased: BannerItem[] = events
+    .filter((ev) => {
+      const evDate = new Date(ev.date);
+      const diff = Math.ceil((evDate.getTime() - now.getTime()) / 86400000);
+      return diff >= 0 && diff <= 14;
+    })
+    .slice(0, 3)
+    .map((ev, idx) => ({
+      id: `ev-${ev.id}`,
+      name: ev.title,
+      sub: ev.memo ?? '일정이 있어요',
+      label: '캘린더 일정',
+      gradient: bannerGradients[idx % bannerGradients.length],
+    }));
+
+  // 오래 연락 안 한 인물
+  const noContact: BannerItem[] = connections
+    .filter((c) => {
+      if (!c.last_contact) return true;
+      const days = Math.floor((Date.now() - new Date(c.last_contact).getTime()) / 86400000);
+      return days > 30;
+    })
+    .slice(0, 3)
+    .map((c, idx) => ({
+      id: `nc-${c.id}`,
+      name: c.name,
+      sub: `${c.last_contact ? getDaysAgo(c.last_contact) : '연락 기록 없음'} — 안부를 전해보세요`,
+      label: '연락 추천',
+      gradient: bannerGradients[idx % bannerGradients.length],
+      phone: c.phone,
+    }));
+
+  const items = [...eventBased, ...noContact].slice(0, 3);
+
+  if (items.length === 0) {
+    return [{
+      id: 'default',
+      name: '소중한 관계를 시작해보세요',
+      sub: '연락처를 추가하고 관계를 관리해보세요',
+      label: 'PICKS',
+      gradient: bannerGradients[0],
+    }];
+  }
+
+  return items;
+}
 
 export default function ContactsPage() {
   const router = useRouter();
@@ -25,6 +85,7 @@ export default function ContactsPage() {
   const [currentBanner, setCurrentBanner] = useState(0);
   const [search, setSearch] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [categories, setCategories] = useState<string[]>(['전체', '친구', '가족', '비즈니스']);
   const [dataLoading, setDataLoading] = useState(true);
   const intervalRef = useRef<NodeJS.Timeout>();
@@ -39,11 +100,16 @@ export default function ContactsPage() {
     if (!user) return;
     const fetchData = async () => {
       setDataLoading(true);
-      const [{ data: conns }, { data: cats }] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0];
+      const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+
+      const [{ data: conns }, { data: cats }, { data: evs }] = await Promise.all([
         supabase.from('connections').select('*').eq('user_id', user.id).order('name'),
         supabase.from('user_categories').select('*').eq('user_id', user.id),
+        supabase.from('calendar_events').select('*').eq('user_id', user.id).gte('date', today).lte('date', twoWeeksLater),
       ]);
       setConnections((conns as Connection[]) ?? []);
+      setEvents((evs as CalendarEvent[]) ?? []);
       const customCats = (cats ?? []).map((c: { name: string }) => c.name);
       const allCats = ['전체', '친구', '가족', '비즈니스', ...customCats.filter((c: string) => !['친구', '가족', '비즈니스'].includes(c))];
       setCategories(allCats);
@@ -52,19 +118,15 @@ export default function ContactsPage() {
     fetchData();
   }, [user]);
 
+  const bannerItems = buildRecommendedBanners(connections, events);
+
   useEffect(() => {
+    if (bannerItems.length <= 1) return;
     intervalRef.current = setInterval(() => {
-      setCurrentBanner((prev) => (prev + 1) % Math.max(bannerData.length, 1));
+      setCurrentBanner((prev) => (prev + 1) % bannerItems.length);
     }, 3000);
     return () => clearInterval(intervalRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections.length]);
-
-  const bannerData = connections
-    .filter((c) => c.birthday)
-    .map((c) => ({ ...c, daysUntil: getDaysUntilBirthday(c.birthday!) }))
-    .sort((a, b) => a.daysUntil - b.daysUntil)
-    .slice(0, 3);
+  }, [bannerItems.length]);
 
   const allCategories = [...categories, '+'];
   const byCat = activeCategory === '전체'
@@ -87,68 +149,48 @@ export default function ContactsPage() {
       <TopBar />
 
       <div className="flex-1 overflow-y-auto pb-36" style={{ paddingTop: '64px' }}>
-        {/* Recommendation banner */}
-        <div className="px-7 pt-4">
-          <Link href="/contacts/bulk-send" className="block">
-            <div className="relative overflow-hidden rounded-2xl" style={{ height: '100px' }}>
-              {dataLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: bannerGradients[0] }}>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : bannerData.length > 0 ? (
-                bannerData.map((person, idx) => (
-                  <div
-                    key={person.id}
-                    className="absolute inset-0 p-5 flex items-center transition-opacity duration-500"
-                    style={{
-                      background: bannerGradients[idx % bannerGradients.length],
-                      opacity: idx === currentBanner ? 1 : 0,
-                      pointerEvents: idx === currentBanner ? 'auto' : 'none',
-                    }}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div>
-                        <p className="text-white/80 text-[11px] font-medium mb-1">생일 알림</p>
-                        <p className="text-white text-[16px] font-bold">
-                          {person.name} 님의 생일이 {person.daysUntil}일 후입니다!
-                        </p>
-                        <p className="text-white/70 text-[12px] mt-0.5">{formatBirthday(person.birthday!)} · 메시지 보내기 →</p>
-                      </div>
-                      <div
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0 ml-4"
-                        style={{ background: 'rgba(255,255,255,0.25)' }}
-                      >
-                        {person.name.charAt(0)}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="absolute inset-0 p-5 flex items-center" style={{ background: bannerGradients[0] }}>
-                  <p className="text-white text-[14px] font-semibold">관계를 추가하고 생일 알림을 받아보세요!</p>
-                </div>
-              )}
-            </div>
-          </Link>
-          {/* Dots */}
-          {bannerData.length > 0 && (
+
+        {/* 상단: 대상 리스트 추천 배너 */}
+        <Link href="/contacts/bulk-send" className="block mt-4">
+          <div className="relative overflow-hidden" style={{ height: '110px' }}>
+            {bannerItems.map((item, idx) => (
+              <div
+                key={item.id}
+                className="absolute inset-0 px-7 flex flex-col justify-center transition-opacity duration-500"
+                style={{
+                  background: item.gradient,
+                  opacity: idx === currentBanner ? 1 : 0,
+                  pointerEvents: idx === currentBanner ? 'auto' : 'none',
+                }}
+              >
+                <span
+                  className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full mb-2 self-start"
+                  style={{ background: 'rgba(255,255,255,0.22)', color: 'white' }}
+                >
+                  {item.label}
+                </span>
+                <p className="text-white text-[18px] font-bold leading-snug">{item.name}</p>
+                <p className="text-white/70 text-[12px] mt-0.5">{item.sub}</p>
+              </div>
+            ))}
+          </div>
+          {bannerItems.length > 1 && (
             <div className="flex justify-center gap-1.5 mt-2">
-              {bannerData.map((_, idx) => (
-                <button
+              {bannerItems.map((_, idx) => (
+                <div
                   key={idx}
-                  onClick={() => setCurrentBanner(idx)}
-                  className="transition-all"
                   style={{
                     width: idx === currentBanner ? '16px' : '6px',
                     height: '6px',
                     borderRadius: '3px',
                     background: idx === currentBanner ? '#D6536D' : '#e0e0e0',
+                    transition: 'all 0.3s',
                   }}
                 />
               ))}
             </div>
           )}
-        </div>
+        </Link>
 
         {/* 검색 */}
         <div className="mt-4 px-7">
@@ -179,7 +221,7 @@ export default function ContactsPage() {
           </div>
         </div>
 
-        {/* Category tabs */}
+        {/* 중앙: 카테고리별 관계 리스트 */}
         <div className="mt-4 px-7">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {allCategories.map((cat) => (
@@ -205,12 +247,10 @@ export default function ContactsPage() {
           </div>
         </div>
 
-        {/* Contact count */}
         <div className="px-7 mt-4 mb-2">
           <p className="text-[13px] text-gray-400">{filtered.length}명</p>
         </div>
 
-        {/* Contact list */}
         <div className="px-7 space-y-3">
           {dataLoading ? (
             <div className="flex justify-center py-10">
@@ -249,6 +289,11 @@ export default function ContactsPage() {
                   <p className="text-[12px] text-gray-400 mt-0.5">
                     마지막 연락: {contact.last_contact ? getDaysAgo(contact.last_contact) : '기록 없음'}
                   </p>
+                  {contact.birthday && (
+                    <p className="text-[11px] mt-0.5" style={{ color: '#EFB11D' }}>
+                      🎂 {formatBirthday(contact.birthday)} · D-{getDaysUntilBirthday(contact.birthday)}
+                    </p>
+                  )}
                 </div>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18l6-6-6-6" />
@@ -259,7 +304,7 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Fixed bottom bulk send button */}
+      {/* 하단: 일괄 전송하기 버튼 */}
       <div className="fixed bottom-16 left-1/2 -translate-x-1/2 w-full max-w-[393px] px-7 pb-3 z-30" style={{ background: 'linear-gradient(to top, #fafaf8 80%, transparent)' }}>
         <Link
           href="/contacts/bulk-send"
@@ -270,7 +315,7 @@ export default function ContactsPage() {
         </Link>
       </div>
 
-      {/* FAB */}
+      {/* 우측 하단 고정 + 버튼 */}
       <Link
         href="/contacts/new"
         className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-30 active:scale-95 transition-transform"

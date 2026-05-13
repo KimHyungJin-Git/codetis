@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { mockImportContacts } from '@/lib/mockData';
 import { formatPhone } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +19,6 @@ interface PhoneContact {
 const BASE_CATEGORIES = ['친구', '가족', '비즈니스'];
 const AVATAR_COLORS = ['#D6536D', '#EFB11D', '#E43D12', '#FFA2B6', '#4CAF50', '#2196F3'];
 
-// Web Contact Picker API 호출 (미지원 기기는 mock으로 폴백)
 async function fetchPhoneContacts(): Promise<PhoneContact[] | null> {
   if (typeof navigator !== 'undefined' && 'contacts' in navigator) {
     try {
@@ -30,17 +30,16 @@ async function fetchPhoneContacts(): Promise<PhoneContact[] | null> {
         phone: formatPhone(c.tel?.[0] ?? ''),
       }));
     } catch {
-      return null; // 사용자가 취소
+      return null;
     }
   }
-  return undefined as unknown as null; // 미지원 → undefined 반환
+  return undefined as unknown as null;
 }
 
 export default function OnboardingPage() {
   const router = useRouter();
 
   const [showSyncPopup, setShowSyncPopup] = useState(false);
-  // step: 'list' = 연락처 선택, 'category' = 카테고리 지정
   const [step, setStep] = useState<'list' | 'category'>('list');
   const [contactList, setContactList] = useState<PhoneContact[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -48,7 +47,6 @@ export default function OnboardingPage() {
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState('');
 
-  // 카테고리
   const [categories, setCategories] = useState<string[]>(BASE_CATEGORIES);
   const [pickedCategory, setPickedCategory] = useState('친구');
   const [showNewCatInput, setShowNewCatInput] = useState(false);
@@ -59,19 +57,14 @@ export default function OnboardingPage() {
     setTimeout(() => setToast(''), 2500);
   };
 
-  // ── 자동 연동 ──
   const handleAutoSync = async () => {
     setSyncing(true);
     const real = await fetchPhoneContacts();
     setSyncing(false);
 
-    if (real === null) {
-      // 사용자 취소
-      return;
-    }
+    if (real === null) return;
     const list = real ?? mockImportContacts;
 
-    // Check if user is logged in before saving
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       const userId = session.user.id;
@@ -96,13 +89,12 @@ export default function OnboardingPage() {
     setTimeout(() => router.push('/home'), 2000);
   };
 
-  // ── 수동 연동: 연락처 목록 불러오기 ──
   const handleOpenManual = async () => {
     setLoading(true);
     const real = await fetchPhoneContacts();
     setLoading(false);
 
-    if (real === null) return; // 사용자 취소
+    if (real === null) return;
 
     const list: PhoneContact[] = real ?? mockImportContacts;
     setContactList(list);
@@ -117,13 +109,11 @@ export default function OnboardingPage() {
       return next;
     });
 
-  // ── 연락처 선택 완료 → 카테고리 단계로 ──
   const handleGoCategory = () => {
     if (selected.size === 0) return;
     setStep('category');
   };
 
-  // ── 새 카테고리 확정 ──
   const confirmNewCategory = () => {
     const name = newCatName.trim();
     if (!name) return;
@@ -135,12 +125,10 @@ export default function OnboardingPage() {
     setShowNewCatInput(false);
   };
 
-  // ── 최종 저장 ──
   const handleSave = async () => {
     const count = selected.size;
     const selectedContacts = contactList.filter((c) => selected.has(c.id));
 
-    // Check if user is logged in before saving
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       const userId = session.user.id;
@@ -170,11 +158,10 @@ export default function OnboardingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-picks-bg page-fade">
 
-      {/* ── 메인 화면 ── */}
+      {/* 메인 화면 */}
       <div className="flex-1 flex flex-col items-center justify-center px-7 pt-16">
         <div className="mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/icon.png"
             alt="PICKS 로고"
             width={112}
@@ -205,23 +192,31 @@ export default function OnboardingPage() {
         </div>
       </div>
 
+      {/* 버튼: 회원가입 / 로그인 */}
       <div className="px-7 pb-12 flex flex-col gap-3">
-        <button
-          onClick={() => setShowSyncPopup(true)}
-          className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white active:scale-95 transition-transform"
+        <Link
+          href="/signup"
+          className="w-full py-4 rounded-2xl text-center font-semibold text-[16px] text-white active:scale-95 transition-transform"
           style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
         >
-          시작하기
-        </button>
-        <Link href="/signup" className="w-full py-4 rounded-2xl text-center font-semibold text-[16px] border-2 active:scale-95 transition-transform" style={{ borderColor: '#D6536D', color: '#D6536D' }}>
           회원가입
         </Link>
-        <Link href="/login" className="text-center text-[14px] font-medium text-gray-400 py-2">
-          이미 계정이 있으신가요? <span style={{ color: '#D6536D' }}>로그인</span>
+        <Link
+          href="/login"
+          className="w-full py-4 rounded-2xl text-center font-semibold text-[16px] border-2 active:scale-95 transition-transform"
+          style={{ borderColor: '#D6536D', color: '#D6536D' }}
+        >
+          로그인
         </Link>
+        <button
+          onClick={() => setShowSyncPopup(true)}
+          className="text-center text-[13px] font-medium text-gray-400 py-2"
+        >
+          연락처만 연동하기
+        </button>
       </div>
 
-      {/* ── 연동 방식 선택 팝업 ── */}
+      {/* 연동 방식 선택 팝업 */}
       {showSyncPopup && contactList.length === 0 && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full max-w-[393px] bg-white rounded-t-3xl p-6 bottom-sheet">
@@ -236,6 +231,7 @@ export default function OnboardingPage() {
               <p className="text-[14px] text-gray-400 text-center mt-2 leading-relaxed">
                 기기의 연락처를 PICKS에 연동하면<br />소중한 관계를 더 쉽게 관리할 수 있어요
               </p>
+              <p className="text-[12px] text-gray-300 mt-1">자동 또는 수동으로 연동할 수 있습니다</p>
             </div>
             <div className="space-y-3">
               <button
@@ -269,17 +265,17 @@ export default function OnboardingPage() {
                     <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: '#D6536D', borderTopColor: 'transparent' }} />
                     불러오는 중...
                   </span>
-                ) : '직접 선택해서 연동하기'}
+                ) : '수동으로 선택해서 연동하기'}
               </button>
-              <button onClick={() => { setShowSyncPopup(false); router.push('/home'); }} className="w-full py-3 text-[14px] text-gray-400 font-medium">
-                나중에 하기
+              <button onClick={() => setShowSyncPopup(false)} className="w-full py-3 text-[14px] text-gray-400 font-medium">
+                닫기
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── STEP 1: 연락처 선택 시트 ── */}
+      {/* STEP 1: 연락처 선택 */}
       {showSyncPopup && contactList.length > 0 && step === 'list' && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full max-w-[393px] bg-white rounded-t-3xl bottom-sheet flex flex-col" style={{ maxHeight: '80vh' }}>
@@ -354,7 +350,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* ── STEP 2: 카테고리 지정 시트 ── */}
+      {/* STEP 2: 카테고리 지정 후 관계 상세 페이지로 이동 */}
       {showSyncPopup && step === 'category' && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="w-full max-w-[393px] bg-white rounded-t-3xl bottom-sheet flex flex-col" style={{ maxHeight: '85vh' }}>
@@ -369,7 +365,6 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {/* 선택된 연락처 미리보기 */}
               <div className="mb-5">
                 <p className="text-[13px] font-semibold text-gray-400 mb-3">선택한 연락처 ({selectedContacts.length}명)</p>
                 <div className="flex flex-wrap gap-2">
@@ -392,9 +387,9 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              {/* 카테고리 선택 */}
               <div>
-                <p className="text-[13px] font-semibold text-gray-400 mb-3">카테고리를 선택하거나 새로 만드세요</p>
+                <p className="text-[13px] font-semibold text-gray-400 mb-1">카테고리를 선택하거나 새로 만드세요</p>
+                <p className="text-[11px] text-gray-300 mb-3">저장 후 개별 상세 페이지에서 메모와 정보를 추가할 수 있어요</p>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {categories.map((cat) => (
                     <button
@@ -410,8 +405,6 @@ export default function OnboardingPage() {
                       {cat}
                     </button>
                   ))}
-
-                  {/* 새 카테고리 추가 버튼 */}
                   {!showNewCatInput && (
                     <button
                       onClick={() => setShowNewCatInput(true)}
@@ -426,7 +419,6 @@ export default function OnboardingPage() {
                   )}
                 </div>
 
-                {/* 새 카테고리 입력 */}
                 {showNewCatInput && (
                   <div className="flex gap-2 items-center mt-1">
                     <input
@@ -457,13 +449,13 @@ export default function OnboardingPage() {
                 )}
               </div>
 
-              {/* 선택된 카테고리 확인 */}
               {pickedCategory && (
                 <div className="mt-5 p-4 rounded-2xl" style={{ background: '#fdf0f2' }}>
                   <p className="text-[13px] text-gray-500">
                     <span className="font-semibold text-picks-dark">{selectedContacts.length}명</span>이{' '}
                     <span className="font-bold" style={{ color: '#D6536D' }}>[{pickedCategory}]</span> 카테고리로 저장됩니다
                   </p>
+                  <p className="text-[11px] text-gray-400 mt-1">저장 후 관계 리스트에서 개별 상세 정보를 입력할 수 있어요</p>
                 </div>
               )}
             </div>
@@ -475,7 +467,7 @@ export default function OnboardingPage() {
                 className="w-full py-4 rounded-2xl font-semibold text-[15px] text-white active:scale-95 transition-transform disabled:opacity-40"
                 style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
               >
-                저장하고 시작하기
+                저장하고 관계 리스트로 이동
               </button>
             </div>
           </div>

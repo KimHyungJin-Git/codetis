@@ -176,37 +176,41 @@ export default function MyPage() {
           <Link href="/mypage/premium">
           <div
             className="relative rounded-2xl p-5 overflow-hidden active:scale-95 transition-transform cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #E43D12 0%, #D6536D 100%)' }}
           >
-            {/* Background decoration */}
+            {/* Background decoration circles for depth */}
             <div
-              className="absolute right-0 top-0 w-32 h-32 rounded-full opacity-10"
-              style={{ background: '#EFB11D', transform: 'translate(30%, -30%)' }}
+              className="absolute right-0 top-0 w-36 h-36 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.10)', transform: 'translate(35%, -35%)' }}
+            />
+            <div
+              className="absolute left-0 bottom-0 w-24 h-24 rounded-full"
+              style={{ background: 'rgba(255,255,255,0.07)', transform: 'translate(-30%, 30%)' }}
             />
             <div className="relative">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[18px]">👑</span>
-                    <span className="text-[14px] font-bold text-white">PICKS 프리미엄</span>
+                    <span className="text-[15px] font-bold text-white tracking-wide">PICKS 프리미엄</span>
                   </div>
-                  <p className="text-[12px] text-white/70 leading-relaxed">
+                  <p className="text-[12px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.85)' }}>
                     무제한 관계 관리, AI 메시지 추천,
                     <br />
                     고급 분석 기능을 사용해보세요
                   </p>
                 </div>
                 <div
-                  className="px-3 py-1.5 rounded-full text-[12px] font-bold flex-shrink-0"
-                  style={{ background: '#EFB11D', color: '#1a1a1a' }}
+                  className="px-3 py-1.5 rounded-full text-[12px] font-bold flex-shrink-0 ml-3"
+                  style={{ background: 'rgba(255,255,255,0.22)', color: 'white', border: '1px solid rgba(255,255,255,0.35)' }}
                 >
                   구독하기
                 </div>
               </div>
-              <div className="flex gap-3 mt-4">
+              <div className="flex gap-4 mt-4">
                 {['무제한 관계', 'AI 추천', '통계 분석'].map((feat) => (
-                  <span key={feat} className="text-[11px] text-white/60 flex items-center gap-1">
-                    <span className="text-[#EFB11D]">✓</span> {feat}
+                  <span key={feat} className="text-[11px] flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    <span style={{ color: '#FFA2B6' }}>✓</span> {feat}
                   </span>
                 ))}
               </div>
