@@ -8,6 +8,7 @@ import Link from 'next/link';
 import TopBar from '@/components/TopBar';
 import BottomNav from '@/components/BottomNav';
 import { getCalendarDays, padZero } from '@/lib/utils';
+import { getKoreanHolidays } from '@/lib/koreanHolidays';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import type { CalendarEvent, Connection } from '@/lib/types';
@@ -71,7 +72,16 @@ export default function CalendarPage() {
       };
     });
 
-  const allEvents: AnyEvent[] = [...events, ...birthdayEvents];
+  const holidays = getKoreanHolidays(year);
+
+  const holidayEvents: AnyEvent[] = Object.entries(holidays).map(([date, name]) => ({
+    id: `holiday-${date}`,
+    title: name,
+    date,
+    color: '#E43D12',
+  }));
+
+  const allEvents: AnyEvent[] = [...events, ...birthdayEvents, ...holidayEvents];
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -169,18 +179,22 @@ export default function CalendarPage() {
                   if (day === null) {
                     return <div key={`empty-${idx}`} className="aspect-square" />;
                   }
+                  const dateStr = `${year}-${padZero(month + 1)}-${padZero(day)}`;
                   const dayEvents = getEventsForDay(day);
+                  const nonHolidayEvents = dayEvents.filter((ev) => !ev.id.startsWith('holiday-'));
                   const dayOfWeek = idx % 7;
                   const selected = isSelected(day);
                   const todayMark = isToday(day);
-                  const dateStr = `${year}-${padZero(month + 1)}-${padZero(day)}`;
+                  const holidayName = holidays[dateStr];
+                  const isHoliday = !!holidayName;
+                  const isRed = dayOfWeek === 0 || isHoliday;
 
                   return (
                     <button
                       key={`day-${day}`}
                       onClick={() => setSelectedDate(dateStr)}
                       className="flex flex-col items-center py-1 px-0.5"
-                      style={{ minHeight: '52px' }}
+                      style={{ minHeight: '56px' }}
                     >
                       <div
                         className="w-8 h-8 flex items-center justify-center rounded-full mb-0.5 text-[13px] font-semibold transition-colors"
@@ -190,7 +204,7 @@ export default function CalendarPage() {
                             ? 'white'
                             : todayMark
                             ? '#D6536D'
-                            : dayOfWeek === 0
+                            : isRed
                             ? '#E43D12'
                             : dayOfWeek === 6
                             ? '#2196F3'
@@ -200,17 +214,26 @@ export default function CalendarPage() {
                       >
                         {day}
                       </div>
+                      {/* 공휴일 이름 */}
+                      {isHoliday && !selected && (
+                        <span
+                          className="text-[8px] leading-tight text-center w-full px-0.5 truncate"
+                          style={{ color: '#E43D12' }}
+                        >
+                          {holidayName.split(' · ')[0]}
+                        </span>
+                      )}
                       {/* Event dots */}
-                      <div className="flex gap-0.5 flex-wrap justify-center max-w-[28px]">
-                        {dayEvents.slice(0, 3).map((ev, evIdx) => (
+                      <div className="flex gap-0.5 flex-wrap justify-center max-w-[28px] mt-0.5">
+                        {nonHolidayEvents.slice(0, 3).map((ev, evIdx) => (
                           <div
                             key={evIdx}
                             className="w-1.5 h-1.5 rounded-full"
                             style={{ background: ev.color }}
                           />
                         ))}
-                        {dayEvents.length > 3 && (
-                          <span className="text-[8px] text-gray-400">+{dayEvents.length - 3}</span>
+                        {nonHolidayEvents.length > 3 && (
+                          <span className="text-[8px] text-gray-400">+{nonHolidayEvents.length - 3}</span>
                         )}
                       </div>
                     </button>
@@ -226,8 +249,15 @@ export default function CalendarPage() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-[15px] font-bold text-picks-dark">
               {selectedDate.replace(/-/g, '.')} 일정
+              {holidays[selectedDate] && (
+                <span className="ml-2 text-[12px] font-medium" style={{ color: '#E43D12' }}>
+                  🎌 {holidays[selectedDate]}
+                </span>
+              )}
             </h3>
-            <span className="text-[13px] text-gray-400">{selectedEvents.length}개</span>
+            <span className="text-[13px] text-gray-400">
+              {selectedEvents.filter((e) => !e.id.startsWith('holiday-')).length}개
+            </span>
           </div>
 
           {selectedEvents.length === 0 ? (
@@ -244,25 +274,46 @@ export default function CalendarPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {selectedEvents.map((ev) => (
-                <Link
-                  key={ev.id}
-                  href={ev.id.startsWith('bday-') ? `/contacts/${ev.id.replace('bday-', '')}` : `/calendar/${ev.id}`}
-                  className="picks-card p-4 flex items-center gap-3 block active:scale-95 transition-transform"
-                >
-                  <div
-                    className="w-1 h-12 rounded-full flex-shrink-0"
-                    style={{ background: ev.color }}
-                  />
-                  <div className="flex-1">
-                    <p className="text-[15px] font-semibold text-picks-dark">{ev.title}</p>
-                    <p className="text-[12px] text-gray-400 mt-0.5">{ev.memo}</p>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
-                </Link>
-              ))}
+              {selectedEvents.map((ev) => {
+                const isHolidayEv = ev.id.startsWith('holiday-');
+                const isBdayEv = ev.id.startsWith('bday-');
+
+                if (isHolidayEv) {
+                  return (
+                    <div
+                      key={ev.id}
+                      className="picks-card p-4 flex items-center gap-3"
+                      style={{ borderLeft: '3px solid #E43D12' }}
+                    >
+                      <div className="text-2xl">🎌</div>
+                      <div className="flex-1">
+                        <p className="text-[15px] font-semibold" style={{ color: '#E43D12' }}>{ev.title}</p>
+                        <p className="text-[12px] text-gray-400 mt-0.5">대한민국 공휴일</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={ev.id}
+                    href={isBdayEv ? `/contacts/${ev.id.replace('bday-', '')}` : `/calendar/${ev.id}`}
+                    className="picks-card p-4 flex items-center gap-3 block active:scale-95 transition-transform"
+                  >
+                    <div
+                      className="w-1 h-12 rounded-full flex-shrink-0"
+                      style={{ background: ev.color }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-[15px] font-semibold text-picks-dark">{ev.title}</p>
+                      <p className="text-[12px] text-gray-400 mt-0.5">{ev.memo}</p>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
