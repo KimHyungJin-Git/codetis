@@ -282,6 +282,9 @@ export default function SignupPage() {
                 <EyeIcon open={showPassConfirm} />
               </button>
             </div>
+            {form.passwordConfirm.length > 0 && form.password === form.passwordConfirm && (
+              <p className="text-[12px] text-green-500 mt-1">비밀번호가 일치합니다!</p>
+            )}
             {form.passwordConfirm.length > 0 && form.password !== form.passwordConfirm && (
               <p className="text-[12px] text-picks-red mt-1">비밀번호가 일치하지 않습니다.</p>
             )}
