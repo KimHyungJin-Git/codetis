@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatPhone, validateEmail } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +15,8 @@ function validateSimplePassword(password: string) {
   const typeCount = [hasUpper, hasLower, hasNumber].filter(Boolean).length;
   return { hasLength, hasUpper, hasLower, hasNumber, isValid: hasLength && typeCount >= 2 };
 }
+
+type EmailStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
 
 const EyeIcon = ({ open }: { open: boolean }) => open ? (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,20 +32,46 @@ const EyeIcon = ({ open }: { open: boolean }) => open ? (
 export default function SignupPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: '', birthday: '', phone: '', email: '', password: '', passwordConfirm: '' });
-  const [emailValid, setEmailValid] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>('idle');
   const [showPass, setShowPass] = useState(false);
   const [showPassConfirm, setShowPassConfirm] = useState(false);
   const [toast, setToast] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const passValidation = validateSimplePassword(form.password);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setForm((p) => ({ ...p, email: val }));
-    setEmailValid(validateEmail(val));
+    setEmailStatus('idle');
     setErrorMsg('');
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!val) return;
+
+    // 이메일 형식 아니면 바로 invalid
+    if (!validateEmail(val)) {
+      setEmailStatus('invalid');
+      return;
+    }
+
+    // 형식 맞으면 중복 검사
+    debounceRef.current = setTimeout(async () => {
+      setEmailStatus('checking');
+      try {
+        const { data, error } = await supabase.rpc('check_email_exists', { check_email: val });
+        if (error) {
+          setEmailStatus('available');
+          return;
+        }
+        setEmailStatus(data === true ? 'unavailable' : 'available');
+      } catch {
+        setEmailStatus('available');
+      }
+    }, 600);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,10 +82,7 @@ export default function SignupPage() {
       setErrorMsg('모든 항목을 입력해주세요.');
       return;
     }
-    if (!emailValid) {
-      setErrorMsg('올바른 이메일 형식을 입력해주세요.');
-      return;
-    }
+    if (emailStatus === 'unavailable' || emailStatus === 'invalid') return;
     if (!passValidation.isValid) {
       setErrorMsg('비밀번호 조건을 확인해주세요.');
       return;
@@ -78,7 +103,7 @@ export default function SignupPage() {
     if (error) {
       const msg = error.message.toLowerCase();
       if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
-        setErrorMsg('이미 사용 중인 이메일입니다. 로그인해주세요.');
+        setEmailStatus('unavailable');
       } else if (msg.includes('password')) {
         setErrorMsg('비밀번호가 너무 간단합니다. 다시 확인해주세요.');
       } else {
@@ -87,7 +112,6 @@ export default function SignupPage() {
       return;
     }
 
-    // 프로필 추가 정보 업데이트
     if (data.user) {
       await supabase.from('profiles').upsert({
         id: data.user.id,
@@ -161,7 +185,7 @@ export default function SignupPage() {
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">아이디(이메일 형식) <span className="text-picks-red">*</span></label>
             <div className="relative">
               <input
-                type="email"
+                type="text"
                 value={form.email}
                 onChange={handleEmailChange}
                 placeholder="example@email.com"
@@ -169,22 +193,40 @@ export default function SignupPage() {
                 spellCheck={false}
                 autoCorrect="off"
                 autoCapitalize="none"
+                inputMode="email"
                 className={`w-full px-4 py-3.5 rounded-xl border bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors pr-10 ${
-                  form.email.length > 0
-                    ? emailValid ? 'border-green-400' : 'border-gray-200'
-                    : 'border-gray-200'
+                  emailStatus === 'unavailable' || emailStatus === 'invalid' ? 'border-picks-red' :
+                  emailStatus === 'available' ? 'border-green-400' : 'border-gray-200'
                 }`}
               />
-              {form.email.length > 0 && emailValid && (
+              {emailStatus === 'checking' && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                  <span className="w-4 h-4 border-2 rounded-full animate-spin block" style={{ borderColor: '#D6536D', borderTopColor: 'transparent' }} />
+                </div>
+              )}
+              {emailStatus === 'available' && (
                 <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-green-500">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
               )}
+              {(emailStatus === 'unavailable' || emailStatus === 'invalid') && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-picks-red">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+              )}
             </div>
-            {form.email.length > 0 && emailValid && (
-              <p className="text-[12px] text-green-500 mt-1">사용 가능한 아이디입니다!</p>
+            {emailStatus === 'available' && (
+              <p className="text-[12px] text-green-500 mt-1">사용 가능합니다!</p>
+            )}
+            {emailStatus === 'unavailable' && (
+              <p className="text-[12px] text-picks-red mt-1">사용 불가능합니다.</p>
+            )}
+            {emailStatus === 'invalid' && (
+              <p className="text-[12px] text-picks-red mt-1">올바른 이메일 형식이 아닙니다.</p>
             )}
           </div>
 
@@ -243,7 +285,6 @@ export default function SignupPage() {
             )}
           </div>
 
-          {/* 에러 메시지 */}
           {errorMsg && (
             <div className="px-4 py-3 rounded-xl text-[13px] text-picks-red text-center" style={{ background: '#fdf0f2' }}>
               {errorMsg}
@@ -252,7 +293,7 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || !emailValid}
+            disabled={loading || !passValidation.isValid || form.password !== form.passwordConfirm || emailStatus === 'unavailable' || emailStatus === 'invalid' || emailStatus === 'checking' || emailStatus === 'idle'}
             className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mt-2 transition-all active:scale-95 disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
           >
