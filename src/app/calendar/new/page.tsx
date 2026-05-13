@@ -33,6 +33,12 @@ export default function NewEventPage() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get('date');
+    if (dateParam) setForm((p) => ({ ...p, date: dateParam }));
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/onboarding');
     }
@@ -54,7 +60,7 @@ export default function NewEventPage() {
     setLoading(false);
 
     if (error) {
-      setToast('저장 중 오류가 발생했습니다.');
+      setToast(`오류: ${error.message}`);
       return;
     }
 

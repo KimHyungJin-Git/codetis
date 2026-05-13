@@ -235,7 +235,7 @@ export default function CalendarPage() {
               <span className="text-4xl mb-3">📅</span>
               <p className="text-[14px] text-gray-400">이날의 일정이 없습니다</p>
               <Link
-                href="/calendar/new"
+                href={`/calendar/new?date=${selectedDate}`}
                 className="mt-3 text-[13px] font-semibold"
                 style={{ color: '#D6536D' }}
               >
@@ -270,7 +270,7 @@ export default function CalendarPage() {
 
       {/* FAB */}
       <Link
-        href="/calendar/new"
+        href={`/calendar/new?date=${selectedDate}`}
         className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-30 active:scale-95 transition-transform"
         style={{ background: '#D6536D' }}
         aria-label="일정 추가"

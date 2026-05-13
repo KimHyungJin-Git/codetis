@@ -9,7 +9,7 @@ const plans = [
   {
     id: 'monthly',
     label: '월간 구독',
-    price: '₩3,900',
+    price: '₩4,900',
     period: '/ 월',
     badge: '',
     desc: '매월 자동 결제',
@@ -25,12 +25,8 @@ const plans = [
 ];
 
 const features = [
-  { icon: '👥', title: '무제한 관계 관리', desc: '연락처 수 제한 없이 모든 관계를 관리하세요' },
-  { icon: '🤖', title: 'AI 메시지 추천', desc: '상황에 맞는 맞춤형 메시지를 AI가 추천해드립니다' },
   { icon: '📊', title: '관계 분석 리포트', desc: '월별 관계 활동을 분석한 상세 리포트를 제공합니다' },
-  { icon: '🔔', title: '무제한 알림 설정', desc: '모든 기념일과 약속에 대한 스마트 알림을 받으세요' },
-  { icon: '📁', title: '고급 카테고리 관리', desc: '무제한 카테고리와 서브 그룹을 만들 수 있습니다' },
-  { icon: '☁️', title: '클라우드 백업', desc: '소중한 관계 데이터를 안전하게 백업하세요' },
+  { icon: '✉️', title: '오프라인 편지 발송', desc: '한 달에 최대 3번까지 오프라인 편지 발송 서비스를 제공합니다' },
 ];
 
 export default function PremiumPage() {
@@ -84,7 +80,7 @@ export default function PremiumPage() {
           소중한 관계를 더 깊이, 더 스마트하게<br />관리하세요
         </p>
         <div className="flex gap-2 mt-5 flex-wrap justify-center">
-          {['무제한 관계', 'AI 추천', '분석 리포트'].map((tag) => (
+          {['분석 리포트', '오프라인 편지'].map((tag) => (
             <span
               key={tag}
               className="px-3 py-1 rounded-full text-[12px] font-semibold"
@@ -148,14 +144,23 @@ export default function PremiumPage() {
         {/* 기능 목록 */}
         <div className="px-7 mt-8">
           <h3 className="text-[16px] font-bold text-picks-dark mb-4">프리미엄 혜택</h3>
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {features.map((feat) => (
-              <div key={feat.title} className="picks-card p-4 flex items-start gap-3">
+              <div key={feat.title} className="picks-card p-4 flex flex-col gap-3">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: '#fdf0f2' }}
                 >
-                  {feat.icon}
+                  {feat.title === '오프라인 편지 발송' ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D6536D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <polyline points="2,4 12,13 22,4" />
+                      <line x1="2" y1="20" x2="8" y2="14" />
+                      <line x1="22" y1="20" x2="16" y2="14" />
+                    </svg>
+                  ) : (
+                    <span className="text-xl">{feat.icon}</span>
+                  )}
                 </div>
                 <div>
                   <p className="text-[14px] font-semibold text-picks-dark">{feat.title}</p>
@@ -191,7 +196,7 @@ export default function PremiumPage() {
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               처리 중...
             </span>
-          ) : `${selectedPlan === 'yearly' ? '₩29,900/년' : '₩3,900/월'}으로 시작하기`}
+          ) : `${selectedPlan === 'yearly' ? '₩29,900/년' : '₩4,900/월'}으로 시작하기`}
         </button>
         <p className="text-[11px] text-gray-400 text-center mt-2">7일 무료 체험 후 자동 결제됩니다</p>
       </div>
