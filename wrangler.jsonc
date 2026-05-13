@@ -1,10 +1,9 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "picks-app",
-	"pages_build_output_dir": ".open-next/assets",
+	"pages_build_output_dir": "out",
 	"compatibility_date": "2026-05-11",
 	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
+		"nodejs_compat"
 	]
 }
