@@ -108,23 +108,19 @@ export default function SignupPage() {
         });
       }
 
-      // 가입 직후 바로 로그인 (이메일 인증 없이)
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: form.email.trim(),
-        password: form.password,
-      });
-
+      // 성공 화면 먼저 표시
       setLoading(false);
       setSuccess(true);
 
-      setTimeout(() => {
-        if (loginError) {
-          // 자동 로그인 실패 시 로그인 페이지로 (이메일 인증이 켜져 있는 경우)
-          router.replace('/login');
-        } else {
-          router.replace('/home');
-        }
-      }, 1500);
+      // 백그라운드에서 자동 로그인 → 2초 후 이동
+      supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      }).then(({ error: loginError }) => {
+        setTimeout(() => {
+          router.replace(loginError ? '/login' : '/home');
+        }, 2000);
+      });
     } catch (err) {
       console.error('Signup error:', err);
       setLoading(false);
