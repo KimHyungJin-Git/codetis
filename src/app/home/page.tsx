@@ -187,7 +187,7 @@ export default function HomePage() {
         .map((c: any) => ({
           user_id: user.id,
           name: (c.name?.[0] || '').trim() || '이름 없음',
-          phone: (c.tel?.[0]?.value || '').replace(/\s/g, ''),
+          phone: (c.tel?.[0] || '').replace(/\s/g, ''),
           avatar_color: colors[Math.floor(Math.random() * colors.length)],
         }))
         .filter((r: any) => r.name !== '이름 없음' || r.phone);
