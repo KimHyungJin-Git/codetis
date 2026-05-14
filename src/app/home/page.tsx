@@ -80,6 +80,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -96,6 +97,15 @@ export default function HomePage() {
       router.replace('/onboarding');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const key = `picks_contact_asked_${user.id}`;
+    if (!localStorage.getItem(key)) {
+      setShowSyncModal(true);
+      localStorage.setItem(key, 'true');
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -350,6 +360,39 @@ export default function HomePage() {
       </div>
 
       <BottomNav />
+
+      {/* 연락처 연동 모달 */}
+      {showSyncModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full max-w-[393px] bg-white rounded-t-3xl px-7 pt-7 pb-10">
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-6" />
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl mx-auto mb-4" style={{ background: '#fdf0f2' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D6536D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <polyline points="17 11 19 13 23 9" />
+              </svg>
+            </div>
+            <h2 className="text-[20px] font-bold text-picks-dark text-center mb-2">연락처 연동하기</h2>
+            <p className="text-[14px] text-gray-400 text-center leading-relaxed mb-8">
+              핸드폰 연락처를 연동하면<br />소중한 관계를 더 쉽게 관리할 수 있어요
+            </p>
+            <button
+              onClick={() => { setShowSyncModal(false); router.push('/contacts/new'); }}
+              className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
+            >
+              연락처 연동하기
+            </button>
+            <button
+              onClick={() => setShowSyncModal(false)}
+              className="w-full py-3.5 rounded-2xl font-semibold text-[15px] text-gray-400 bg-gray-100 transition-all active:scale-95"
+            >
+              다음에 할게요
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
