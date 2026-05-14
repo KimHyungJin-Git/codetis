@@ -280,17 +280,19 @@ export default function ContactDetailClient() {
 
       </div>
 
-      <Link
-        href="/contacts/new"
-        className="fixed bottom-8 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-40 active:scale-90 transition-transform"
-        style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
-        aria-label="친구 추가"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </Link>
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-[393px] z-40 flex justify-end pr-6 pointer-events-none">
+        <Link
+          href="/contacts/new"
+          className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform pointer-events-auto"
+          style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
+          aria-label="친구 추가"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </Link>
+      </div>
 
       {toast && (
         <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 toast-enter">

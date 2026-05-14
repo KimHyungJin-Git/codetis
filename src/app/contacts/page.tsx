@@ -346,17 +346,19 @@ export default function ContactsPage() {
       </div>
 
       {/* 우측 하단 고정 + 버튼 */}
-      <Link
-        href="/contacts/new"
-        className="fixed bottom-24 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-30 active:scale-95 transition-transform"
-        style={{ background: '#D6536D' }}
-        aria-label="연락처 추가"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </Link>
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-[393px] z-30 flex justify-end pr-6 pointer-events-none">
+        <Link
+          href="/contacts/new"
+          className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform pointer-events-auto"
+          style={{ background: '#D6536D' }}
+          aria-label="연락처 추가"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </Link>
+      </div>
 
       <BottomNav />
     </div>
