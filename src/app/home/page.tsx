@@ -102,10 +102,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
-    const key = `picks_contact_asked_${user.id}`;
-    if (!localStorage.getItem(key)) {
+    if (!user.user_metadata?.contact_asked) {
       setShowSyncModal(true);
-      localStorage.setItem(key, 'true');
+      supabase.auth.updateUser({ data: { contact_asked: true } });
     }
   }, [user]);
 
