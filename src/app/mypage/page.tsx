@@ -13,6 +13,17 @@ import type { Profile } from '@/lib/types';
 
 const menuItems = [
   {
+    id: 'follows',
+    label: '팔로우 관리',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D6536D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+      </svg>
+    ),
+    href: '/mypage/follows',
+  },
+  {
     id: 'account',
     label: '계정 관리',
     icon: (
@@ -49,9 +60,10 @@ export default function MyPage() {
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [connectionCount, setConnectionCount] = useState(0);
-  const [categoryCount, setCategoryCount] = useState(0);
-  const [templateCount, setTemplateCount] = useState(0);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [dataLoading, setDataLoading] = useState(true);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -63,21 +75,29 @@ export default function MyPage() {
     if (!user) return;
     const fetchData = async () => {
       setDataLoading(true);
-      const [{ data: profileData }, { data: connections }, { data: categories }, { data: templates }] =
+      const [{ data: profileData }, { data: connections }, { data: followerRows }, { data: followingRows }] =
         await Promise.all([
           supabase.from('profiles').select('*').eq('id', user.id).single(),
           supabase.from('connections').select('id').eq('user_id', user.id),
-          supabase.from('user_categories').select('id').eq('user_id', user.id),
-          supabase.from('message_templates').select('id').eq('user_id', user.id),
+          supabase.from('follows').select('id').eq('following_id', user.id),
+          supabase.from('follows').select('id').eq('follower_id', user.id),
         ]);
       setProfile(profileData as Profile ?? null);
       setConnectionCount((connections ?? []).length);
-      setCategoryCount((categories ?? []).length);
-      setTemplateCount((templates ?? []).length);
+      setFollowerCount((followerRows ?? []).length);
+      setFollowingCount((followingRows ?? []).length);
       setDataLoading(false);
     };
     fetchData();
   }, [user]);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
+
+  const handleCopyProfileLink = () => {
+    if (!user) return;
+    const url = `${window.location.origin}/profile/${user.id}`;
+    navigator.clipboard.writeText(url).then(() => showToast('프로필 링크가 복사됐어요!'));
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -150,9 +170,9 @@ export default function MyPage() {
               ) : (
                 <div className="grid grid-cols-3 gap-0">
                   {[
-                    { value: String(connectionCount), label: '연락처 연동' },
-                    { value: String(categoryCount), label: '카테고리' },
-                    { value: String(templateCount), label: '템플릿' },
+                    { value: String(connectionCount), label: '연락처' },
+                    { value: String(followerCount), label: '팔로워' },
+                    { value: String(followingCount), label: '팔로잉' },
                   ].map((stat, idx) => (
                     <div
                       key={stat.label}
@@ -219,6 +239,21 @@ export default function MyPage() {
           </Link>
         </div>
 
+        {/* 프로필 링크 공유 */}
+        <div className="px-7 mb-4">
+          <button
+            onClick={handleCopyProfileLink}
+            className="w-full py-3.5 rounded-2xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: '#fdf0f2', color: '#D6536D' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            내 프로필 링크 공유하기
+          </button>
+        </div>
+
         {/* Menu items */}
         <div className="px-7 space-y-2">
           {menuItems.map((item) => (
@@ -264,6 +299,14 @@ export default function MyPage() {
       </div>
 
       <BottomNav />
+
+      {toast && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 toast-enter">
+          <div className="bg-picks-dark text-white px-5 py-3 rounded-2xl shadow-lg text-[14px] font-medium whitespace-nowrap">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
