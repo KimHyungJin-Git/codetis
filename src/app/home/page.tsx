@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import TopBar from '@/components/TopBar';
@@ -11,6 +11,37 @@ import { getDaysUntilBirthday, formatBirthday } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import type { Connection, CalendarEvent } from '@/lib/types';
+
+function parseVCard(text: string): { name: string; phone: string }[] {
+  const results: { name: string; phone: string }[] = [];
+  const cards = text.split(/END:VCARD/i);
+  for (const card of cards) {
+    if (!card.includes('BEGIN:VCARD')) continue;
+    let name = '';
+    let phone = '';
+    let cellPhone = '';
+    for (const raw of card.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (/^FN:/i.test(line)) {
+        name = line.replace(/^FN:/i, '').trim();
+      } else if (!name && /^N:/i.test(line)) {
+        const parts = line.replace(/^N:/i, '').split(';');
+        name = [parts[1], parts[0]].filter(Boolean).join(' ').trim();
+      }
+      if (/^TEL[^:]*:/i.test(line)) {
+        const val = line.split(':').slice(1).join(':').trim().replace(/[\s\-().]/g, '');
+        let num = val.startsWith('+82') ? '0' + val.slice(3) : val.startsWith('82') && val.length >= 11 ? '0' + val.slice(2) : val;
+        num = num.replace(/[^\d]/g, '');
+        const fmt = num.length === 11 ? `${num.slice(0,3)}-${num.slice(3,7)}-${num.slice(7)}` : num.length === 10 ? `${num.slice(0,3)}-${num.slice(3,6)}-${num.slice(6)}` : num;
+        if (/CELL|MOBILE|IPHONE/i.test(line)) { cellPhone = fmt; }
+        else if (!phone) { phone = fmt; }
+      }
+    }
+    const finalPhone = cellPhone || phone;
+    if (name) results.push({ name, phone: finalPhone });
+  }
+  return results;
+}
 
 const todayBase = new Date();
 todayBase.setHours(0, 0, 0, 0);
@@ -83,6 +114,10 @@ export default function HomePage() {
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncResult, setSyncResult] = useState<{ count: number } | null>(null);
+  const [vcfContacts, setVcfContacts] = useState<{ name: string; phone: string }[]>([]);
+  const [selectedVcf, setSelectedVcf] = useState<Set<number>>(new Set());
+  const [vcfSaving, setVcfSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -203,6 +238,49 @@ export default function HomePage() {
     } catch {
       setSyncLoading(false);
     }
+  };
+
+  const handleVcfFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const parsed = parseVCard(text);
+      if (parsed.length === 0) return;
+      setVcfContacts(parsed);
+      setSelectedVcf(new Set(parsed.map((_, i) => i)));
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  const toggleVcfSelect = (i: number) => {
+    setSelectedVcf((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+
+  const handleVcfSubmit = async () => {
+    if (!user || selectedVcf.size === 0) return;
+    setVcfSaving(true);
+    const colors = ['#D6536D', '#E43D12', '#EFB11D', '#4CAF50', '#2196F3', '#9C27B0'];
+    const rows = [...selectedVcf].map((i) => ({
+      user_id: user.id,
+      name: vcfContacts[i].name,
+      phone: vcfContacts[i].phone,
+      avatar_color: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    await supabase.from('connections').insert(rows);
+    const { data } = await supabase.from('connections').select('*').eq('user_id', user.id);
+    setConnections((data as Connection[]) ?? []);
+    setSyncResult({ count: rows.length });
+    setVcfSaving(false);
+    setVcfContacts([]);
+    setSelectedVcf(new Set());
+    setShowSyncModal(false);
   };
 
   const showCall = (phone: string) => {
@@ -427,38 +505,118 @@ export default function HomePage() {
       {/* 연락처 연동 모달 */}
       {showSyncModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="w-full max-w-[393px] bg-white rounded-t-3xl px-7 pt-7 pb-10">
-            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-6" />
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl mx-auto mb-4" style={{ background: '#fdf0f2' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D6536D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <polyline points="17 11 19 13 23 9" />
-              </svg>
-            </div>
-            <h2 className="text-[20px] font-bold text-picks-dark text-center mb-2">연락처 연동하기</h2>
-            <p className="text-[14px] text-gray-400 text-center leading-relaxed mb-8">
-              핸드폰 연락처를 연동하면<br />소중한 관계를 더 쉽게 관리할 수 있어요
-            </p>
-            <button
-              onClick={handleContactSync}
-              disabled={syncLoading}
-              className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95 disabled:opacity-70"
-              style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
-            >
-              {syncLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  불러오는 중...
-                </span>
-              ) : '연락처 연동하기'}
-            </button>
-            <button
-              onClick={() => setShowSyncModal(false)}
-              className="w-full py-3.5 rounded-2xl font-semibold text-[15px] text-gray-400 bg-gray-100 transition-all active:scale-95"
-            >
-              다음에 할게요
-            </button>
+          <div className="w-full max-w-[393px] bg-white rounded-t-3xl pt-7 pb-10" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-6 flex-shrink-0" />
+
+            {vcfContacts.length === 0 ? (
+              /* ── 방법 선택 화면 ── */
+              <div className="px-7">
+                <div className="flex items-center justify-center w-16 h-16 rounded-2xl mx-auto mb-4" style={{ background: '#fdf0f2' }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D6536D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <polyline points="17 11 19 13 23 9" />
+                  </svg>
+                </div>
+                <h2 className="text-[20px] font-bold text-picks-dark text-center mb-2">연락처 연동하기</h2>
+                <p className="text-[14px] text-gray-400 text-center leading-relaxed mb-6">
+                  핸드폰 연락처를 연동하면<br />소중한 관계를 더 쉽게 관리할 수 있어요
+                </p>
+                <button
+                  onClick={handleContactSync}
+                  disabled={syncLoading}
+                  className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95 disabled:opacity-70"
+                  style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
+                >
+                  {syncLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      불러오는 중...
+                    </span>
+                  ) : '연락처 앱에서 불러오기'}
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-4 rounded-2xl font-semibold text-[15px] mb-3 transition-all active:scale-95 flex items-center justify-center gap-2"
+                  style={{ background: '#fdf0f2', color: '#D6536D' }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" />
+                  </svg>
+                  파일로 가져오기 (.vcf)
+                </button>
+                <input ref={fileInputRef} type="file" accept=".vcf" onChange={handleVcfFile} className="hidden" />
+                <button
+                  onClick={() => setShowSyncModal(false)}
+                  className="w-full py-3.5 rounded-2xl font-semibold text-[15px] text-gray-400 bg-gray-100 transition-all active:scale-95"
+                >
+                  다음에 할게요
+                </button>
+              </div>
+            ) : (
+              /* ── 연락처 선택 화면 ── */
+              <>
+                <div className="px-7 flex-shrink-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-[18px] font-bold text-picks-dark">연락처 선택</h2>
+                    <span className="text-[13px] font-medium" style={{ color: '#D6536D' }}>{selectedVcf.size}명 선택됨</span>
+                  </div>
+                  <p className="text-[13px] text-gray-400 mb-3">추가할 연락처를 선택해주세요 ({vcfContacts.length}명 인식됨)</p>
+                  <button
+                    onClick={() => setSelectedVcf(selectedVcf.size === vcfContacts.length ? new Set() : new Set(vcfContacts.map((_, i) => i)))}
+                    className="text-[13px] font-semibold mb-3"
+                    style={{ color: '#D6536D' }}
+                  >
+                    {selectedVcf.size === vcfContacts.length ? '전체 해제' : '전체 선택'}
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-7 min-h-0">
+                  {vcfContacts.map((c, i) => (
+                    <button
+                      key={i}
+                      onClick={() => toggleVcfSelect(i)}
+                      className="w-full flex items-center gap-3 py-3 border-b border-gray-50 active:bg-gray-50 text-left"
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors"
+                        style={{ background: selectedVcf.has(i) ? '#D6536D' : 'transparent', borderColor: selectedVcf.has(i) ? '#D6536D' : '#ddd' }}
+                      >
+                        {selectedVcf.has(i) && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-semibold text-picks-dark truncate">{c.name}</p>
+                        <p className="text-[12px] text-gray-400">{c.phone || '번호 없음'}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-7 pt-4 flex-shrink-0">
+                  <button
+                    onClick={handleVcfSubmit}
+                    disabled={vcfSaving || selectedVcf.size === 0}
+                    className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95 disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
+                  >
+                    {vcfSaving ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        저장 중...
+                      </span>
+                    ) : `${selectedVcf.size}명 추가하기`}
+                  </button>
+                  <button
+                    onClick={() => { setVcfContacts([]); setSelectedVcf(new Set()); }}
+                    className="w-full py-3.5 rounded-2xl font-semibold text-[15px] text-gray-400 bg-gray-100 transition-all active:scale-95"
+                  >
+                    취소
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
