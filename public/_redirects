@@ -1,2 +1,8 @@
+/contacts/new /contacts/new 200
+/contacts/category /contacts/category 200
+/contacts/bulk-send /contacts/bulk-send 200
+/contacts/bulk-send/result /contacts/bulk-send/result 200
 /contacts/* /contacts/placeholder 200
+
+/calendar/new /calendar/new 200
 /calendar/* /calendar/placeholder 200
