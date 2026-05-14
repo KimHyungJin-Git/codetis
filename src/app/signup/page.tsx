@@ -167,7 +167,8 @@ export default function SignupPage() {
               type="date"
               value={form.birthday}
               onChange={(e) => setForm((p) => ({ ...p, birthday: e.target.value }))}
-              className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
+              className="w-full box-border px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
+              style={{ maxWidth: '100%' }}
             />
           </div>
 

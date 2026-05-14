@@ -198,7 +198,7 @@ export default function OnboardingPage() {
         <p className="text-[13px] font-medium tracking-widest text-gray-400 uppercase mb-2">픽스</p>
         <p className="text-center text-[18px] font-semibold text-picks-dark mt-4 leading-relaxed">소중한 관계를<br />픽스하세요</p>
         <p className="text-center text-[14px] text-gray-400 mt-3 leading-relaxed">생일, 기념일, 안부 — 모든 순간을<br />놓치지 않도록 도와드려요</p>
-        <div className="flex gap-3 mt-10">
+        <div className="flex gap-3 mt-10 mb-8">
           <div className="w-2 h-2 rounded-full bg-picks-rose" />
           <div className="w-2 h-2 rounded-full bg-picks-pink" />
           <div className="w-2 h-2 rounded-full bg-picks-yellow" />
