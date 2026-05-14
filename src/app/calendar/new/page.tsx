@@ -103,12 +103,47 @@ export default function NewEventPage() {
           {/* 날짜 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">날짜 <span className="text-picks-red">*</span></label>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
-            />
+            <div className="flex gap-2">
+              <select
+                value={form.date ? form.date.split('-')[0] : ''}
+                onChange={(e) => {
+                  const parts = form.date ? form.date.split('-') : ['', '01', '01'];
+                  setForm((p) => ({ ...p, date: `${e.target.value}-${parts[1] || '01'}-${parts[2] || '01'}` }));
+                }}
+                className="flex-1 px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">년</option>
+                {Array.from({ length: 16 }, (_, i) => 2020 + i).map((y) => (
+                  <option key={y} value={y}>{y}년</option>
+                ))}
+              </select>
+              <select
+                value={form.date ? form.date.split('-')[1] : ''}
+                onChange={(e) => {
+                  const parts = form.date ? form.date.split('-') : [String(new Date().getFullYear()), '', '01'];
+                  setForm((p) => ({ ...p, date: `${parts[0]}-${e.target.value}-${parts[2] || '01'}` }));
+                }}
+                className="w-[78px] px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">월</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={String(m).padStart(2, '0')}>{m}월</option>
+                ))}
+              </select>
+              <select
+                value={form.date ? form.date.split('-')[2] : ''}
+                onChange={(e) => {
+                  const parts = form.date ? form.date.split('-') : [String(new Date().getFullYear()), '01', ''];
+                  setForm((p) => ({ ...p, date: `${parts[0]}-${parts[1] || '01'}-${e.target.value}` }));
+                }}
+                className="w-[78px] px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">일</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d).padStart(2, '0')}>{d}일</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* 제목 */}

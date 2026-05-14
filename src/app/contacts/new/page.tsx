@@ -199,12 +199,48 @@ export default function NewContactPage() {
           {/* 생일 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">생일</label>
-            <input
-              type="date"
-              value={form.birthday}
-              onChange={(e) => setForm((p) => ({ ...p, birthday: e.target.value }))}
-              className="w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors"
-            />
+            <div className="flex gap-2">
+              <select
+                value={form.birthday ? form.birthday.split('-')[0] : ''}
+                onChange={(e) => {
+                  const parts = form.birthday ? form.birthday.split('-') : ['', '01', '01'];
+                  const val = e.target.value ? `${e.target.value}-${parts[1] || '01'}-${parts[2] || '01'}` : '';
+                  setForm((p) => ({ ...p, birthday: val }));
+                }}
+                className="flex-1 px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">년</option>
+                {Array.from({ length: 80 }, (_, i) => 2010 - i).map((y) => (
+                  <option key={y} value={y}>{y}년</option>
+                ))}
+              </select>
+              <select
+                value={form.birthday ? form.birthday.split('-')[1] : ''}
+                onChange={(e) => {
+                  const parts = form.birthday ? form.birthday.split('-') : ['2000', '', '01'];
+                  setForm((p) => ({ ...p, birthday: `${parts[0] || '2000'}-${e.target.value}-${parts[2] || '01'}` }));
+                }}
+                className="w-[78px] px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">월</option>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={String(m).padStart(2, '0')}>{m}월</option>
+                ))}
+              </select>
+              <select
+                value={form.birthday ? form.birthday.split('-')[2] : ''}
+                onChange={(e) => {
+                  const parts = form.birthday ? form.birthday.split('-') : ['2000', '01', ''];
+                  setForm((p) => ({ ...p, birthday: `${parts[0] || '2000'}-${parts[1] || '01'}-${e.target.value}` }));
+                }}
+                className="w-[78px] px-3 py-3.5 rounded-xl border border-gray-200 bg-white text-[15px] text-picks-dark focus:border-picks-rose transition-colors appearance-none"
+              >
+                <option value="">일</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d).padStart(2, '0')}>{d}일</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* 카테고리 */}
