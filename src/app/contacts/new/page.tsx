@@ -23,7 +23,7 @@ async function fetchOneContact(): Promise<{ name: string; phone: string } | null
       return null;
     }
   }
-  return { name: '강하늘', phone: '010-9876-5432' };
+  return null;
 }
 
 export default function NewContactPage() {
@@ -38,22 +38,28 @@ export default function NewContactPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/onboarding');
+    if (authLoading) return;
+    if (user) {
+      supabase.from('user_categories').select('name').eq('user_id', user.id).then(({ data }) => {
+        if (data && data.length > 0) {
+          const customCats = data.map((c: { name: string }) => c.name);
+          const allCats = [...BASE_CATEGORIES, ...customCats.filter((c: string) => !BASE_CATEGORIES.includes(c))];
+          setCategories(allCats);
+        }
+      });
+    } else {
+      // 게스트: localStorage 연락처에서 카테고리 추출
+      try {
+        const saved = localStorage.getItem('picks_guest_contacts');
+        if (saved) {
+          const contacts = JSON.parse(saved);
+          const customCats = Array.from(new Set(contacts.map((c: { category: string }) => c.category))) as string[];
+          const allCats = [...BASE_CATEGORIES, ...customCats.filter((c) => !BASE_CATEGORIES.includes(c))];
+          setCategories(allCats);
+        }
+      } catch { /* ignore */ }
     }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    // Load existing categories
-    supabase.from('user_categories').select('name').eq('user_id', user.id).then(({ data }) => {
-      if (data && data.length > 0) {
-        const customCats = data.map((c: { name: string }) => c.name);
-        const allCats = [...BASE_CATEGORIES, ...customCats.filter((c: string) => !BASE_CATEGORIES.includes(c))];
-        setCategories(allCats);
-      }
-    });
-  }, [user]);
+  }, [user, authLoading]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
 
@@ -80,53 +86,60 @@ export default function NewContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone || !user) return;
+    if (!form.name || !form.phone) return;
     setLoading(true);
 
-    const colorIndex = Math.floor(Math.random() * AVATAR_COLORS.length);
-    const avatarColor = AVATAR_COLORS[colorIndex];
+    const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
-    const { error } = await supabase.from('connections').insert({
-      user_id: user.id,
-      name: form.name,
-      phone: form.phone,
-      birthday: form.birthday || null,
-      category: form.category,
-      memo: form.memo,
-      avatar_color: avatarColor,
-      last_contact: new Date().toISOString().split('T')[0],
-    });
+    if (user) {
+      const { error } = await supabase.from('connections').insert({
+        user_id: user.id,
+        name: form.name,
+        phone: form.phone,
+        birthday: form.birthday || null,
+        category: form.category,
+        memo: form.memo,
+        avatar_color: avatarColor,
+        last_contact: new Date().toISOString().split('T')[0],
+      });
 
-    if (!error) {
-      // Upsert category if custom
-      await supabase
-        .from('user_categories')
-        .upsert({ user_id: user.id, name: form.category }, { onConflict: 'user_id,name' });
-    }
+      if (!error) {
+        await supabase
+          .from('user_categories')
+          .upsert({ user_id: user.id, name: form.category }, { onConflict: 'user_id,name' });
+      }
 
-    setLoading(false);
-
-    if (error) {
-      showToast('저장 중 오류가 발생했습니다.');
-      return;
+      setLoading(false);
+      if (error) { showToast('저장 중 오류가 발생했습니다.'); return; }
+    } else {
+      // 게스트 모드: localStorage에 저장
+      try {
+        const existing = localStorage.getItem('picks_guest_contacts');
+        const contacts = existing ? JSON.parse(existing) : [];
+        contacts.push({
+          id: `guest-${Date.now()}`,
+          user_id: 'guest',
+          name: form.name,
+          phone: form.phone,
+          birthday: form.birthday || null,
+          category: form.category,
+          memo: form.memo,
+          avatar_color: avatarColor,
+          last_contact: new Date().toISOString().split('T')[0],
+        });
+        localStorage.setItem('picks_guest_contacts', JSON.stringify(contacts));
+        localStorage.setItem('picks_is_guest', 'true');
+      } catch { /* ignore */ }
+      setLoading(false);
     }
 
     showToast('연락처가 저장되었습니다!');
     setTimeout(() => router.push('/contacts'), 1200);
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-picks-bg">
-        <div className="w-6 h-6 border-2 border-picks-rose border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-picks-bg page-fade">
 
-      {/* 헤더 */}
       <div
         className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[393px] z-40 flex items-center justify-between px-7 bg-picks-bg"
         style={{ height: '56px', paddingTop: 'env(safe-area-inset-top)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}
@@ -142,7 +155,6 @@ export default function NewContactPage() {
 
       <div className="flex-1 overflow-y-auto pb-16" style={{ paddingTop: '72px' }}>
 
-        {/* 연락처에서 불러오기 */}
         <div className="px-7 mb-6">
           <button
             onClick={handleImport}
@@ -169,7 +181,6 @@ export default function NewContactPage() {
 
         <form onSubmit={handleSubmit} className="px-7 flex flex-col gap-5">
 
-          {/* 이름 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">이름 <span className="text-picks-red">*</span></label>
             <input
@@ -181,7 +192,6 @@ export default function NewContactPage() {
             />
           </div>
 
-          {/* 연락처 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">연락처 <span className="text-picks-red">*</span></label>
             <input
@@ -194,7 +204,6 @@ export default function NewContactPage() {
             />
           </div>
 
-          {/* 생일 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">생일</label>
             <input
@@ -205,10 +214,8 @@ export default function NewContactPage() {
             />
           </div>
 
-          {/* 카테고리 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-2">카테고리</label>
-
             <div className="flex flex-wrap gap-2 mb-2">
               {categories.map((cat) => (
                 <button
@@ -225,7 +232,6 @@ export default function NewContactPage() {
                   {cat}
                 </button>
               ))}
-
               {!showNewCatInput && (
                 <button
                   type="button"
@@ -240,7 +246,6 @@ export default function NewContactPage() {
                 </button>
               )}
             </div>
-
             {showNewCatInput && (
               <div className="flex gap-2 items-center mt-1">
                 <input
@@ -271,7 +276,6 @@ export default function NewContactPage() {
                 </button>
               </div>
             )}
-
             {form.category && (
               <p className="text-[12px] mt-2" style={{ color: '#D6536D' }}>
                 ✓ <span className="font-semibold">{form.category}</span> 카테고리로 저장됩니다
@@ -279,7 +283,6 @@ export default function NewContactPage() {
             )}
           </div>
 
-          {/* 메모 */}
           <div>
             <label className="block text-[13px] font-medium text-gray-600 mb-1.5">메모</label>
             <textarea
