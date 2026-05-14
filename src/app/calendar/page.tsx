@@ -22,6 +22,66 @@ type AnyEvent = {
   memo?: string;
 };
 
+// 고정 공휴일 & 기념일
+const FIXED_HOLIDAYS: { month: number; day: number; title: string; color: string; isPublic: boolean }[] = [
+  { month: 1,  day: 1,  title: '신정',         color: '#E43D12', isPublic: true },
+  { month: 3,  day: 1,  title: '삼일절',        color: '#E43D12', isPublic: true },
+  { month: 5,  day: 5,  title: '어린이날',      color: '#E43D12', isPublic: true },
+  { month: 6,  day: 6,  title: '현충일',        color: '#6B7280', isPublic: true },
+  { month: 8,  day: 15, title: '광복절',        color: '#E43D12', isPublic: true },
+  { month: 10, day: 3,  title: '개천절',        color: '#E43D12', isPublic: true },
+  { month: 10, day: 9,  title: '한글날',        color: '#E43D12', isPublic: true },
+  { month: 12, day: 25, title: '성탄절 🎄',     color: '#E43D12', isPublic: true },
+  { month: 2,  day: 14, title: '발렌타인데이 🍫', color: '#D6536D', isPublic: false },
+  { month: 3,  day: 14, title: '화이트데이 🍬',  color: '#FFA2B6', isPublic: false },
+  { month: 5,  day: 14, title: '로즈데이 🌹',   color: '#D6536D', isPublic: false },
+  { month: 10, day: 31, title: '할로윈 🎃',     color: '#EFB11D', isPublic: false },
+  { month: 11, day: 11, title: '빼빼로데이 🍫', color: '#D6536D', isPublic: false },
+  { month: 12, day: 14, title: '허그데이 🤗',   color: '#D6536D', isPublic: false },
+];
+
+// 음력 공휴일 (연도별 고정)
+const LUNAR_HOLIDAYS: Record<string, { title: string; color: string }> = {
+  '2024-02-10': { title: '설날 🏮', color: '#E43D12' },
+  '2024-05-15': { title: '부처님오신날 🪷', color: '#EFB11D' },
+  '2024-09-17': { title: '추석 🌕', color: '#E43D12' },
+  '2025-01-29': { title: '설날 🏮', color: '#E43D12' },
+  '2025-05-05': { title: '부처님오신날 🪷', color: '#EFB11D' },
+  '2025-10-06': { title: '추석 🌕', color: '#E43D12' },
+  '2026-02-17': { title: '설날 🏮', color: '#E43D12' },
+  '2026-05-24': { title: '부처님오신날 🪷', color: '#EFB11D' },
+  '2026-09-25': { title: '추석 🌕', color: '#E43D12' },
+  '2027-02-07': { title: '설날 🏮', color: '#E43D12' },
+  '2027-05-13': { title: '부처님오신날 🪷', color: '#EFB11D' },
+  '2027-09-15': { title: '추석 🌕', color: '#E43D12' },
+};
+
+function getHolidayEvents(year: number): AnyEvent[] {
+  const result: AnyEvent[] = FIXED_HOLIDAYS.map((h) => ({
+    id: `holiday-${year}-${h.month}-${h.day}`,
+    title: h.title,
+    date: `${year}-${padZero(h.month)}-${padZero(h.day)}`,
+    color: h.color,
+  }));
+  Object.entries(LUNAR_HOLIDAYS).forEach(([date, h]) => {
+    if (date.startsWith(String(year))) {
+      result.push({ id: `lunar-${date}`, title: h.title, date, color: h.color });
+    }
+  });
+  return result;
+}
+
+function getPublicHolidayDates(year: number): Set<string> {
+  const dates = new Set<string>();
+  FIXED_HOLIDAYS.filter((h) => h.isPublic).forEach((h) => {
+    dates.add(`${year}-${padZero(h.month)}-${padZero(h.day)}`);
+  });
+  Object.entries(LUNAR_HOLIDAYS).forEach(([date]) => {
+    if (date.startsWith(String(year))) dates.add(date);
+  });
+  return dates;
+}
+
 export default function CalendarPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -71,7 +131,9 @@ export default function CalendarPage() {
       };
     });
 
-  const allEvents: AnyEvent[] = [...events, ...birthdayEvents];
+  const holidayEvents = getHolidayEvents(year);
+  const publicHolidayDates = getPublicHolidayDates(year);
+  const allEvents: AnyEvent[] = [...events, ...birthdayEvents, ...holidayEvents];
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -175,6 +237,7 @@ export default function CalendarPage() {
                   const todayMark = isToday(day);
                   const dateStr = `${year}-${padZero(month + 1)}-${padZero(day)}`;
 
+                  const isHoliday = publicHolidayDates.has(dateStr);
                   return (
                     <button
                       key={`day-${day}`}
@@ -190,7 +253,7 @@ export default function CalendarPage() {
                             ? 'white'
                             : todayMark
                             ? '#D6536D'
-                            : dayOfWeek === 0
+                            : dayOfWeek === 0 || isHoliday
                             ? '#E43D12'
                             : dayOfWeek === 6
                             ? '#2196F3'
