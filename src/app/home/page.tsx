@@ -81,6 +81,8 @@ export default function HomePage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ count: number } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -130,6 +132,12 @@ export default function HomePage() {
     fetchData();
   }, [user]);
 
+  useEffect(() => {
+    if (!syncResult) return;
+    const t = setTimeout(() => setSyncResult(null), 3000);
+    return () => clearTimeout(t);
+  }, [syncResult]);
+
   const bannerItems = buildBannerItems(connections, events);
 
   useEffect(() => {
@@ -150,6 +158,53 @@ export default function HomePage() {
     const days = Math.floor((Date.now() - new Date(c.last_contact).getTime()) / 86400000);
     return days > 30;
   }).length;
+
+  const handleContactSync = async () => {
+    if (!user) return;
+
+    const supportsContactPicker =
+      typeof navigator !== 'undefined' &&
+      'contacts' in navigator &&
+      'select' in (navigator as any).contacts;
+
+    if (!supportsContactPicker) {
+      setShowSyncModal(false);
+      router.push('/contacts/new');
+      return;
+    }
+
+    try {
+      setSyncLoading(true);
+      const selected = await (navigator as any).contacts.select(['name', 'tel'], { multiple: true });
+
+      if (!selected || selected.length === 0) {
+        setSyncLoading(false);
+        return;
+      }
+
+      const colors = ['#D6536D', '#E43D12', '#EFB11D', '#4CAF50', '#2196F3', '#9C27B0', '#FF5722', '#00BCD4'];
+      const rows = selected
+        .map((c: any) => ({
+          user_id: user.id,
+          name: (c.name?.[0] || '').trim() || '이름 없음',
+          phone: (c.tel?.[0]?.value || '').replace(/\s/g, ''),
+          avatar_color: colors[Math.floor(Math.random() * colors.length)],
+        }))
+        .filter((r: any) => r.name !== '이름 없음' || r.phone);
+
+      if (rows.length > 0) {
+        await supabase.from('connections').insert(rows);
+        const { data } = await supabase.from('connections').select('*').eq('user_id', user.id);
+        setConnections((data as Connection[]) ?? []);
+        setSyncResult({ count: rows.length });
+      }
+
+      setSyncLoading(false);
+      setShowSyncModal(false);
+    } catch {
+      setSyncLoading(false);
+    }
+  };
 
   const showCall = (phone: string) => {
     if (phone) window.location.href = `tel:${phone.replace(/-/g, '')}`;
@@ -361,6 +416,15 @@ export default function HomePage() {
 
       <BottomNav />
 
+      {/* 연락처 연동 성공 토스트 */}
+      {syncResult && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 toast-enter">
+          <div className="bg-picks-dark text-white px-5 py-3.5 rounded-2xl shadow-lg text-[14px] font-medium text-center whitespace-nowrap">
+            {syncResult.count}명의 연락처가 추가됐어요 🎉
+          </div>
+        </div>
+      )}
+
       {/* 연락처 연동 모달 */}
       {showSyncModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
@@ -378,11 +442,17 @@ export default function HomePage() {
               핸드폰 연락처를 연동하면<br />소중한 관계를 더 쉽게 관리할 수 있어요
             </p>
             <button
-              onClick={() => { setShowSyncModal(false); router.push('/contacts/new'); }}
-              className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95"
+              onClick={handleContactSync}
+              disabled={syncLoading}
+              className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white mb-3 transition-all active:scale-95 disabled:opacity-70"
               style={{ background: 'linear-gradient(135deg, #D6536D 0%, #E43D12 100%)' }}
             >
-              연락처 연동하기
+              {syncLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  불러오는 중...
+                </span>
+              ) : '연락처 연동하기'}
             </button>
             <button
               onClick={() => setShowSyncModal(false)}
