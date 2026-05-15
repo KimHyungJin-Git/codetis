@@ -7,6 +7,7 @@ import { getDaysUntilBirthday, getDaysSinceContact, getDaysAgo, formatDate } fro
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import type { Connection } from '@/lib/types';
+import { getGreetingSuggestions, getCurrentSeason } from '@/lib/templates';
 
 export default function ContactDetailClient() {
   const router = useRouter();
@@ -92,6 +93,8 @@ export default function ContactDetailClient() {
 
   const daysUntilBday = contact.birthday ? getDaysUntilBirthday(contact.birthday) : null;
   const daysSinceContact = contact.last_contact ? getDaysSinceContact(contact.last_contact) : null;
+  const greetingSuggestions = getGreetingSuggestions(contact.category, daysSinceContact, contact.name);
+  const season = getCurrentSeason();
 
   return (
     <div className="flex flex-col min-h-screen bg-picks-bg page-fade">
@@ -268,7 +271,49 @@ export default function ContactDetailClient() {
 
         </div>
 
-        <div className="px-7 mt-2 mb-4">
+        {/* 안부 메시지 추천 */}
+        <div className="px-7 mt-2">
+          <div className="picks-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[16px]">{season.emoji}</span>
+              <p className="text-[13px] font-bold text-picks-dark">안부 메시지 추천</p>
+            </div>
+            <div className="space-y-2">
+              {greetingSuggestions.map((s, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    if (contact.phone) {
+                      const encoded = encodeURIComponent(s.content);
+                      window.location.href = `sms:${contact.phone.replace(/-/g, '')}?body=${encoded}`;
+                    }
+                  }}
+                  className="w-full text-left p-3 rounded-xl border border-gray-100 active:scale-95 transition-transform"
+                  style={{ background: '#fafaf8' }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: '#fdf0f2', color: '#D6536D' }}
+                    >
+                      {s.label}
+                    </span>
+                    <span className="text-[10px] text-gray-300">{s.reason}</span>
+                  </div>
+                  <p className="text-[13px] text-picks-dark leading-relaxed line-clamp-2">{s.content}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                    탭하면 문자 앱으로 바로 전송
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-7 mt-3 mb-4">
           <button
             onClick={() => router.push('/contacts/bulk-send')}
             className="w-full py-4 rounded-2xl font-semibold text-[16px] text-white transition-all active:scale-95"

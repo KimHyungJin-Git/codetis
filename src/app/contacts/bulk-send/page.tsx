@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/useAuth';
 import type { Connection, MessageTemplate } from '@/lib/types';
+import { getCurrentSeason, SEASON_TEMPLATES } from '@/lib/templates';
 
 export default function BulkSendPage() {
   const router = useRouter();
@@ -21,6 +22,8 @@ export default function BulkSendPage() {
   const [selectAll, setSelectAll] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const season = getCurrentSeason();
+  const seasonSuggestions = SEASON_TEMPLATES[season.key];
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -186,6 +189,41 @@ export default function BulkSendPage() {
               </div>
             </>
           )}
+
+          {/* 시즌 추천 문구 칩 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[15px]">{season.emoji}</span>
+              <p className="text-[13px] font-semibold text-picks-dark">{season.label} 추천 문구</p>
+            </div>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+              {seasonSuggestions.map((s, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCustomText(s.content)}
+                  className="flex-shrink-0 px-3 py-2 rounded-xl text-left transition-all active:scale-95 border"
+                  style={{
+                    background: customText === s.content ? season.color : 'white',
+                    borderColor: customText === s.content ? season.color : '#e5e5e5',
+                    maxWidth: '180px',
+                  }}
+                >
+                  <p
+                    className="text-[11px] font-semibold mb-0.5"
+                    style={{ color: customText === s.content ? 'rgba(255,255,255,0.8)' : season.color }}
+                  >
+                    {s.label}
+                  </p>
+                  <p
+                    className="text-[12px] leading-snug line-clamp-2"
+                    style={{ color: customText === s.content ? 'white' : '#555' }}
+                  >
+                    {s.content}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Editable text */}
           <div>
